@@ -4,6 +4,7 @@ import '../services/api_service.dart';
 import '../services/session_service.dart';
 import '../theme/app_theme.dart';
 import 'cgu_screen.dart';
+import 'inscription_screen.dart';
 
 class OtpScreen extends StatefulWidget {
   final String clientId;
@@ -16,6 +17,7 @@ class OtpScreen extends StatefulWidget {
 class _OtpScreenState extends State<OtpScreen> {
   final codeCtrl = TextEditingController();
   bool loading = false;
+  bool resending = false;
 
   Future<void> _verify() async {
     setState(() => loading = true);
@@ -27,9 +29,51 @@ class _OtpScreenState extends State<OtpScreen> {
         builder: (_) => CguScreen(clientId: widget.clientId),
       ));
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst("Exception: ", ""))),
+      );
     } finally {
       setState(() => loading = false);
+    }
+  }
+
+  Future<void> _resend() async {
+    setState(() => resending = true);
+    try {
+      await ApiService.resendOtp(widget.email);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Nouveau code envoyé.")),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst("Exception: ", ""))),
+      );
+    } finally {
+      setState(() => resending = false);
+    }
+  }
+
+  Future<void> _recommencer() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Recommencer l'inscription"),
+        content: const Text("Vous devrez saisir à nouveau toutes vos informations."),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Annuler")),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("Recommencer")),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await SessionService.clear();
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const InscriptionScreen()),
+        (route) => false,
+      );
     }
   }
 
@@ -60,6 +104,21 @@ class _OtpScreenState extends State<OtpScreen> {
                 loading
                     ? const CircularProgressIndicator()
                     : ElevatedButton(onPressed: _verify, child: const Text("Vérifier")),
+                const SizedBox(height: 20),
+                TextButton(
+                  onPressed: resending ? null : _resend,
+                  child: resending
+                      ? const SizedBox(
+                          height: 16, width: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text("Renvoyer le code"),
+                ),
+                TextButton(
+                  onPressed: _recommencer,
+                  child: const Text("Mauvais email ? Recommencer l'inscription",
+                      style: TextStyle(color: AppColors.textDark)),
+                ),
               ],
             ),
           ),

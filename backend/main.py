@@ -57,6 +57,9 @@ class VerifyOtpRequest(BaseModel):
     email: EmailStr
     otp_code: str
 
+class ResendOtpRequest(BaseModel):
+    email: EmailStr
+
 class ChoixPaiementRequest(BaseModel):
     client_id: str
     mode_paiement: Literal["jour", "semaine", "mois"]
@@ -218,6 +221,25 @@ def verify_otp(data: VerifyOtpRequest):
     }).eq("id", client["id"]).execute()
 
     return {"message": "Email vérifié avec succès.", "client_id": client["id"]}
+
+@app.post("/api/client/resend-otp")
+def resend_otp(data: ResendOtpRequest):
+    res = supabase.table("clients").select("*").eq("email", data.email).execute()
+    if not res.data:
+        raise HTTPException(404, "Client introuvable.")
+    client = res.data[0]
+
+    if client["email_verified"]:
+        raise HTTPException(400, "Cet email est déjà vérifié.")
+
+    otp = generate_otp()
+    supabase.table("clients").update({
+        "otp_code": otp,
+        "otp_expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
+    }).eq("id", client["id"]).execute()
+
+    send_otp_email(data.email, otp)
+    return {"message": "Nouveau code envoyé."}
 
 @app.post("/api/client/accepter-cgu")
 def accepter_cgu(client_id: str):

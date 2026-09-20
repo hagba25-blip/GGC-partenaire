@@ -43,6 +43,15 @@ class ApiService {
     return _handle(res);
   }
 
+  static Future<Map<String, dynamic>> resendOtp(String email) async {
+    final res = await http.post(
+      Uri.parse("$baseUrl/api/client/resend-otp"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({"email": email}),
+    );
+    return _handle(res);
+  }
+
   static Future<void> accepterCgu(String clientId) async {
     await http.post(Uri.parse("$baseUrl/api/client/accepter-cgu?client_id=$clientId"));
   }
