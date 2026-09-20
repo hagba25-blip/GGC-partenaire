@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import '../services/session_service.dart';
 import 'otp_screen.dart';
 
 class InscriptionScreen extends StatefulWidget {
@@ -82,9 +83,11 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
       );
 
       // Sauvegarde locale nécessaire pour la tâche de fond quotidienne
+      // et pour restaurer l'app à cette étape si elle est fermée/rouverte.
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('device_id', res["device_id"]);
       await prefs.setString('client_id', res["client_id"]);
+      await SessionService.saveInscription(res["client_id"], res["device_id"], emailCtrl.text);
 
       // Première position envoyée immédiatement (l'admin n'a pas à attendre 24h)
       _envoyerPositionInitiale(res["device_id"]);

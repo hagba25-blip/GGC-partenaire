@@ -7,7 +7,7 @@ import os
 import random
 import string
 import requests
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from typing import Optional, Literal
 
 import bcrypt
@@ -167,7 +167,7 @@ def inscription(data: InscriptionRequest, request: Request):
         "date_naissance": data.date_naissance.isoformat(),
         "email": data.email,
         "otp_code": otp,
-        "otp_expires_at": (datetime.utcnow() + timedelta(minutes=10)).isoformat(),
+        "otp_expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
         "prix_total": data.prix_total,
         "mode_paiement": "mois",     # valeur par défaut, sera mise à jour après choix
         "duree_mois": 6,
@@ -206,7 +206,10 @@ def verify_otp(data: VerifyOtpRequest):
 
     if client["otp_code"] != data.otp_code:
         raise HTTPException(400, "Code incorrect.")
-    if datetime.fromisoformat(client["otp_expires_at"]) < datetime.utcnow():
+    expires_at = datetime.fromisoformat(client["otp_expires_at"])
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at < datetime.now(timezone.utc):
         raise HTTPException(400, "Code expiré, redemandez-en un.")
 
     supabase.table("clients").update({

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import '../services/api_service.dart';
+import '../services/session_service.dart';
 import '../theme/app_theme.dart';
 import 'choix_paiement_screen.dart';
 
@@ -58,6 +59,7 @@ class _CguScreenState extends State<CguScreen> {
     setState(() => loading = true);
     try {
       await ApiService.accepterCgu(widget.clientId);
+      await SessionService.markCguAccepted();
       if (!mounted) return;
       Navigator.pushReplacement(context, MaterialPageRoute(
         builder: (_) => ChoixPaiementScreen(clientId: widget.clientId),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import '../services/api_service.dart';
+import '../services/session_service.dart';
 import '../theme/app_theme.dart';
 import 'cgu_screen.dart';
 
@@ -20,6 +21,7 @@ class _OtpScreenState extends State<OtpScreen> {
     setState(() => loading = true);
     try {
       await ApiService.verifyOtp(widget.email, codeCtrl.text);
+      await SessionService.markOtpVerified();
       if (!mounted) return;
       Navigator.pushReplacement(context, MaterialPageRoute(
         builder: (_) => CguScreen(clientId: widget.clientId),

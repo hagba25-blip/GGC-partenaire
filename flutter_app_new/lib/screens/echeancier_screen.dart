@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
+import '../services/session_service.dart';
 import '../theme/app_theme.dart';
+import 'inscription_screen.dart';
 
 class EcheancierScreen extends StatefulWidget {
   final String clientId;
@@ -71,7 +73,41 @@ class _EcheancierScreenState extends State<EcheancierScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Mon échéancier")),
+      appBar: AppBar(
+        title: const Text("Mon échéancier"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout_rounded),
+            tooltip: "Déconnexion",
+            onPressed: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (_) => AlertDialog(
+                  title: const Text("Déconnexion"),
+                  content: const Text(
+                    "Voulez-vous vraiment vous déconnecter ? Vous devrez vous "
+                    "réinscrire pour retrouver l'accès à votre compte.",
+                  ),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Annuler")),
+                    TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("Déconnexion")),
+                  ],
+                ),
+              );
+              if (confirm == true) {
+                await SessionService.clear();
+                if (context.mounted) {
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (_) => const InscriptionScreen()),
+                    (route) => false,
+                  );
+                }
+              }
+            },
+          ),
+        ],
+      ),
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : FadeIn(
