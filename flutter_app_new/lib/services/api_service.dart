@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 class ApiService {
   // Remplacez par l'URL de votre backend déployé (Render, Railway, etc.)
-  static const String baseUrl = "https://votre-backend-ggc.onrender.com";
+  static const String baseUrl = "https://ggc-partenaire.onrender.com";
 
   static Future<Map<String, dynamic>> inscription({
     required String nom,
