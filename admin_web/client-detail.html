@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GGC PARTENAIRE — Détail client</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="dashboard">
+    <aside class="sidebar">
+      <div class="logo">GGC PARTENAIRE</div>
+      <nav>
+        <a href="dashboard.html">📊 Tableau de bord</a>
+        <a href="clients.html" class="active">👥 Clients</a>
+        <a href="carte.html">🗺️ Carte des appareils</a>
+        <a href="#" onclick="logout()">🚪 Déconnexion</a>
+      </nav>
+    </aside>
+
+    <main class="main-content">
+      <div class="topbar">
+        <h2 id="clientName">Chargement…</h2>
+        <span class="admin-badge" id="adminBadge"></span>
+      </div>
+
+      <div class="table-card fade-in-up" style="padding: 28px;">
+        <div id="detailRows"></div>
+
+        <h3 style="margin-top:24px;color:var(--sky-dark);">Actions</h3>
+        <div class="action-buttons">
+          <button class="btn-action btn-lock" onclick="restreindre('lock_ecran')">🔒 Verrouiller écran</button>
+          <button class="btn-action btn-lock" onclick="restreindre('lock_wifi')">📶 Couper Wifi/Data</button>
+          <button class="btn-action btn-lock" onclick="restreindre('lock_sim')">📵 Bloquer SIM</button>
+          <button class="btn-action btn-unlock" onclick="restreindre('unlock_all')">✅ Lever toutes restrictions</button>
+        </div>
+
+        <h3 style="margin-top:28px;color:var(--sky-dark);">Échéancier</h3>
+        <table style="margin-top:12px;">
+          <thead><tr><th>N°</th><th>Montant</th><th>Date prévue</th><th>Statut</th></tr></thead>
+          <tbody id="echeancesBody"></tbody>
+        </table>
+
+        <h3 style="margin-top:28px;color:var(--sky-dark);">Historique des actions admin</h3>
+        <table style="margin-top:12px;">
+          <thead><tr><th>Action</th><th>Raison</th><th>Date</th></tr></thead>
+          <tbody id="actionsBody"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="client-detail.js"></script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GGC PARTENAIRE — Connexion Admin</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="login-body">
+  <div class="login-card fade-in-up">
+    <div class="logo-circle">GGC</div>
+    <h1>GGC PARTENAIRE</h1>
+    <p class="subtitle">Espace administrateur</p>
+
+    <form id="loginForm">
+      <div class="input-group">
+        <label>Nom d'utilisateur</label>
+        <input type="text" id="username" required>
+      </div>
+      <div class="input-group">
+        <label>Mot de passe</label>
+        <input type="password" id="password" required>
+      </div>
+      <button type="submit" class="btn-primary">Se connecter</button>
+      <p id="errorMsg" class="error-msg"></p>
+    </form>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+</body>
+</html>
