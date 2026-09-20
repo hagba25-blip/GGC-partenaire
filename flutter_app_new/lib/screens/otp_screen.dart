@@ -81,45 +81,47 @@ class _OtpScreenState extends State<OtpScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Vérification")),
-      body: Center(
-        child: FadeInUp(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.mark_email_read_rounded, size: 72, color: AppColors.skyBlueDark),
-                const SizedBox(height: 16),
-                Text("Code envoyé à ${widget.email}", textAlign: TextAlign.center),
-                const SizedBox(height: 24),
-                TextField(
-                  controller: codeCtrl,
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 28, letterSpacing: 12),
-                  decoration: const InputDecoration(counterText: ""),
-                ),
-                const SizedBox(height: 16),
-                loading
-                    ? const CircularProgressIndicator()
-                    : ElevatedButton(onPressed: _verify, child: const Text("Vérifier")),
-                const SizedBox(height: 20),
-                TextButton(
-                  onPressed: resending ? null : _resend,
-                  child: resending
-                      ? const SizedBox(
-                          height: 16, width: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text("Renvoyer le code"),
-                ),
-                TextButton(
-                  onPressed: _recommencer,
-                  child: const Text("Mauvais email ? Recommencer l'inscription",
-                      style: TextStyle(color: AppColors.textDark)),
-                ),
-              ],
+      body: SingleChildScrollView(
+        child: Center(
+          child: FadeInUp(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.mark_email_read_rounded, size: 72, color: AppColors.skyBlueDark),
+                  const SizedBox(height: 16),
+                  Text("Code envoyé à ${widget.email}", textAlign: TextAlign.center),
+                  const SizedBox(height: 24),
+                  TextField(
+                    controller: codeCtrl,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 28, letterSpacing: 12),
+                    decoration: const InputDecoration(counterText: ""),
+                  ),
+                  const SizedBox(height: 16),
+                  loading
+                      ? const CircularProgressIndicator()
+                      : ElevatedButton(onPressed: _verify, child: const Text("Vérifier")),
+                  const SizedBox(height: 20),
+                  TextButton(
+                    onPressed: resending ? null : _resend,
+                    child: resending
+                        ? const SizedBox(
+                            height: 16, width: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text("Renvoyer le code"),
+                  ),
+                  TextButton(
+                    onPressed: _recommencer,
+                    child: const Text("Mauvais email ? Recommencer l'inscription",
+                        style: TextStyle(color: AppColors.textDark)),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

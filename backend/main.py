@@ -262,6 +262,13 @@ def choix_paiement(data: ChoixPaiementRequest):
         raise HTTPException(404, "Client introuvable.")
     client = client_res.data[0]
 
+    # Empêche la création d'un second plan si un plan existe déjà pour ce client
+    # (évite les doublons en cas de double appel / re-soumission).
+    existing = supabase.table("echeances").select("id").eq("client_id", data.client_id).execute()
+    if existing.data:
+        nb_echeances, montant = calculer_echeances(client["prix_total"], data.mode_paiement, data.duree_mois)
+        return {"message": "Plan déjà créé.", "nb_echeances": nb_echeances, "montant_echeance": montant}
+
     nb_echeances, montant = calculer_echeances(client["prix_total"], data.mode_paiement, data.duree_mois)
 
     supabase.table("clients").update({
