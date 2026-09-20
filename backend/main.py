@@ -28,6 +28,8 @@ SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 JWT_SECRET = os.environ["JWT_SECRET"]
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "onboarding@resend.dev")
+LEEKPAY_SECRET_KEY = os.environ.get("LEEKPAY_SECRET_KEY", "")
+LEEKPAY_PUBLIC_KEY = os.environ.get("LEEKPAY_PUBLIC_KEY", "")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
@@ -85,6 +87,10 @@ class PaiementRequest(BaseModel):
     echeance_id: str
     methode: Literal["mobile_money", "carte_bancaire"]
     reference_transaction: str
+
+class CreerPaiementRequest(BaseModel):
+    client_id: str
+    echeance_id: str
 
 # ---------------------------------------------------------------------------
 # UTILITAIRES
@@ -287,6 +293,120 @@ def choix_paiement(data: ChoixPaiementRequest):
 def get_echeances(client_id: str):
     res = supabase.table("echeances").select("*").eq("client_id", client_id).order("numero").execute()
     return res.data
+
+@app.post("/api/client/creer-paiement")
+def creer_paiement(data: CreerPaiementRequest):
+    """
+    Crée une session de paiement LeekPay pour une échéance donnée et
+    renvoie l'URL de paiement à ouvrir dans l'app (navigateur/webview).
+    La confirmation réelle arrive ensuite via le webhook LeekPay,
+    jamais directement depuis le téléphone du client (sécurité).
+    """
+    if not LEEKPAY_SECRET_KEY:
+        raise HTTPException(500, "Paiement non configuré côté serveur.")
+
+    echeance_res = supabase.table("echeances").select("*").eq("id", data.echeance_id).execute()
+    if not echeance_res.data:
+        raise HTTPException(404, "Échéance introuvable.")
+    echeance = echeance_res.data[0]
+
+    if echeance["statut"] == "payee":
+        raise HTTPException(400, "Cette échéance est déjà payée.")
+
+    client_res = supabase.table("clients").select("nom, prenom, email, telephone").eq("id", data.client_id).execute()
+    client = client_res.data[0] if client_res.data else {}
+
+    try:
+        response = requests.post(
+            "https://leekpay.fr/api/v1/checkout",
+            headers={
+                "Authorization": f"Bearer {LEEKPAY_SECRET_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "amount": int(echeance["montant"]),
+                "currency": "XOF",
+                "description": f"Échéance n°{echeance['numero']} - GGC PARTENAIRE",
+                "customer_email": client.get("email"),
+                "customer_name": f"{client.get('prenom', '')} {client.get('nom', '')}".strip(),
+                "customer_phone": client.get("telephone"),
+                "metadata": {
+                    "client_id": data.client_id,
+                    "echeance_id": data.echeance_id,
+                },
+            },
+            timeout=15,
+        )
+        response.raise_for_status()
+        result = response.json()
+    except Exception as e:
+        raise HTTPException(502, f"Erreur LeekPay : {e}")
+
+    return {"checkout_url": result["data"]["payment_url"]}
+
+@app.post("/api/webhook/leekpay")
+async def leekpay_webhook(request: Request):
+    """
+    Reçoit la confirmation de paiement de LeekPay. La signature HMAC-SHA256
+    est calculée avec la clé PUBLIQUE (comme documenté par LeekPay) pour
+    s'assurer que l'appel vient bien de LeekPay et pas d'un tiers.
+    Le webhook est la seule source de vérité : jamais le navigateur/app.
+    """
+    import hashlib
+    import hmac as hmac_lib
+
+    payload = await request.body()
+    signature = request.headers.get("x-leekpay-signature", "")
+
+    expected_sig = hmac_lib.new(
+        LEEKPAY_PUBLIC_KEY.encode(), payload, hashlib.sha256
+    ).hexdigest()
+    if not hmac_lib.compare_digest(expected_sig, signature):
+        raise HTTPException(401, "Signature invalide.")
+
+    body = await request.json()
+    event = body.get("event")
+    data = body.get("data", {})
+
+    if event != "payment.completed" or data.get("status") != "paid":
+        return {"message": "Événement ignoré."}
+
+    metadata = data.get("metadata") or {}
+    client_id = metadata.get("client_id")
+    echeance_id = metadata.get("echeance_id")
+    if not client_id or not echeance_id:
+        raise HTTPException(400, "Métadonnées manquantes dans le webhook.")
+
+    echeance = supabase.table("echeances").select("montant, statut").eq("id", echeance_id).execute()
+    if not echeance.data:
+        raise HTTPException(404, "Échéance introuvable.")
+    if echeance.data[0]["statut"] == "payee":
+        return {"message": "Déjà traité."}  # évite les doublons si le webhook est renvoyé
+
+    supabase.table("paiements").insert({
+        "client_id": client_id,
+        "echeance_id": echeance_id,
+        "montant": data.get("amount", echeance.data[0]["montant"]),
+        "methode": data.get("payment_method", "mobile_money"),
+        "reference_transaction": data.get("transaction_id", ""),
+    }).execute()
+
+    supabase.table("echeances").update({
+        "statut": "payee",
+        "date_payee": datetime.now(timezone.utc).isoformat(),
+    }).eq("id", echeance_id).execute()
+
+    restantes = supabase.table("echeances").select("id").eq("client_id", client_id).eq("statut", "a_payer").execute()
+    if not restantes.data:
+        supabase.table("clients").update({"statut": "solde"}).eq("id", client_id).execute()
+        device = supabase.table("devices").select("id").eq("client_id", client_id).execute()
+        if device.data:
+            supabase.table("devices").update({
+                "device_admin_actif": False,
+                "statut_appareil": "normal",
+            }).eq("id", device.data[0]["id"]).execute()
+
+    return {"message": "Paiement confirmé."}
 
 @app.post("/api/client/payer")
 def payer_echeance(data: PaiementRequest):

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
 import '../theme/app_theme.dart';
@@ -14,14 +15,30 @@ class EcheancierScreen extends StatefulWidget {
   State<EcheancierScreen> createState() => _EcheancierScreenState();
 }
 
-class _EcheancierScreenState extends State<EcheancierScreen> {
+class _EcheancierScreenState extends State<EcheancierScreen> with WidgetsBindingObserver {
   List<dynamic> echeances = [];
   bool loading = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _load();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Rafraîchit l'échéancier quand l'utilisateur revient dans l'app
+    // après avoir terminé (ou abandonné) le paiement dans le navigateur.
+    if (state == AppLifecycleState.resumed) {
+      _load();
+    }
   }
 
   Future<void> _load() async {
@@ -33,41 +50,31 @@ class _EcheancierScreenState extends State<EcheancierScreen> {
   }
 
   Future<void> _payer(Map e) async {
-    final methode = await showModalBottomSheet<String>(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text("Choisir un moyen de paiement", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            ListTile(
-              leading: const Icon(Icons.phone_iphone, color: AppColors.skyBlueDark),
-              title: const Text("Mobile Money"),
-              onTap: () => Navigator.pop(context, "mobile_money"),
-            ),
-            ListTile(
-              leading: const Icon(Icons.credit_card, color: AppColors.skyBlueDark),
-              title: const Text("Carte bancaire"),
-              onTap: () => Navigator.pop(context, "carte_bancaire"),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (methode == null) return;
-
-    // Intégration réelle : rediriger vers Stripe Checkout ou l'API Mobile Money (MTN/Moov)
-    // ici avant de confirmer le paiement côté backend.
-    await ApiService.payer(
-      clientId: widget.clientId,
-      echeanceId: e["id"],
-      methode: methode,
-      reference: "TX-${DateTime.now().millisecondsSinceEpoch}",
-    );
-    _load();
+    try {
+      final checkoutUrl = await ApiService.creerPaiement(
+        clientId: widget.clientId,
+        echeanceId: e["id"],
+      );
+      final uri = Uri.parse(checkoutUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        // Le statut se met à jour via le webhook LeekPay côté serveur ;
+        // on rafraîchit l'échéancier au retour sur l'app.
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Terminez le paiement, puis revenez ici.")),
+          );
+        }
+      } else {
+        throw Exception("Impossible d'ouvrir la page de paiement.");
+      }
+    } catch (err) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(err.toString().replaceFirst("Exception: ", ""))),
+        );
+      }
+    }
   }
 
   @override

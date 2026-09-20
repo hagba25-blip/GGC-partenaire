@@ -97,6 +97,19 @@ class ApiService {
     return _handle(res);
   }
 
+  static Future<String> creerPaiement({
+    required String clientId,
+    required String echeanceId,
+  }) async {
+    final res = await http.post(
+      Uri.parse("$baseUrl/api/client/creer-paiement"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({"client_id": clientId, "echeance_id": echeanceId}),
+    );
+    final body = _handle(res);
+    return body["checkout_url"];
+  }
+
   static Future<void> updatePosition({
     required String deviceId,
     required double lat,

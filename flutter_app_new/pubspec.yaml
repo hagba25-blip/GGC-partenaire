@@ -10,13 +10,15 @@ dependencies:
   flutter:
     sdk: flutter
   http: ^1.2.2
+  url_launcher: ^6.3.1
   device_info_plus: ^11.1.0
   geolocator: ^13.0.1
   shared_preferences: ^2.3.2
   intl: ^0.19.0
   animate_do: ^3.3.4
+  device_policy_manager: ^0.10.0   # Device Admin API (empêche désinstallation)
   connectivity_plus: ^6.0.5
-  workmanager: ^0.10.0             # tâche de fond quotidienne (position + vérif statut)
+  workmanager: ^0.5.2             # tâche de fond quotidienne (position + vérif statut)
   network_info_plus: ^6.0.1
 
 dev_dependencies:
@@ -25,3 +27,4 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  
