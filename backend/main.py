@@ -296,6 +296,13 @@ def choix_paiement(data: ChoixPaiementRequest):
 
     return {"message": "Plan de paiement créé.", "nb_echeances": nb_echeances, "montant_echeance": montant}
 
+@app.get("/api/client/{client_id}/existe")
+def client_existe(client_id: str):
+    """Utilisé par l'app au démarrage pour vérifier que la session locale
+    correspond toujours à un client réel (utile si la base a été réinitialisée)."""
+    res = supabase.table("clients").select("id").eq("id", client_id).execute()
+    return {"existe": bool(res.data)}
+
 @app.get("/api/client/{client_id}/echeances")
 def get_echeances(client_id: str):
     res = supabase.table("echeances").select("*").eq("client_id", client_id).order("numero").execute()

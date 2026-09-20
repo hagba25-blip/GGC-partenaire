@@ -72,7 +72,38 @@ class _CguScreenState extends State<CguScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Conditions d'utilisation")),
+      appBar: AppBar(
+        title: const Text("Conditions d'utilisation"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: "Recommencer",
+            onPressed: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (_) => AlertDialog(
+                  title: const Text("Recommencer l'inscription"),
+                  content: const Text("Vous devrez saisir à nouveau toutes vos informations."),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Annuler")),
+                    TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("Recommencer")),
+                  ],
+                ),
+              );
+              if (confirm == true) {
+                await SessionService.clear();
+                if (context.mounted) {
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (_) => const InscriptionScreen()),
+                    (route) => false,
+                  );
+                }
+              }
+            },
+          ),
+        ],
+      ),
       body: FadeIn(
         child: Column(
           children: [

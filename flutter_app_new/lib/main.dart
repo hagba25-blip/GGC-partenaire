@@ -53,18 +53,33 @@ class _StartupRouterState extends State<StartupRouter> {
           return const InscriptionScreen();
         }
 
-        switch (session["stage"]) {
-          case "otp":
-            return OtpScreen(clientId: session["client_id"]!, email: session["email"]!);
-          case "cgu":
-            return CguScreen(clientId: session["client_id"]!);
-          case "paiement":
-            return ChoixPaiementScreen(clientId: session["client_id"]!);
-          case "echeancier":
-            return _EcheancierLoader(clientId: session["client_id"]!);
-          default:
-            return const InscriptionScreen();
-        }
+        return FutureBuilder<bool>(
+          future: ApiService.clientExiste(session["client_id"]!),
+          builder: (context, existsSnapshot) {
+            if (existsSnapshot.connectionState != ConnectionState.done) {
+              return const Scaffold(body: Center(child: CircularProgressIndicator()));
+            }
+            if (existsSnapshot.data == false) {
+              // La base a été réinitialisée côté serveur : on efface la
+              // session locale et on repart proprement de l'inscription.
+              SessionService.clear();
+              return const InscriptionScreen();
+            }
+
+            switch (session["stage"]) {
+              case "otp":
+                return OtpScreen(clientId: session["client_id"]!, email: session["email"]!);
+              case "cgu":
+                return CguScreen(clientId: session["client_id"]!);
+              case "paiement":
+                return ChoixPaiementScreen(clientId: session["client_id"]!);
+              case "echeancier":
+                return _EcheancierLoader(clientId: session["client_id"]!);
+              default:
+                return const InscriptionScreen();
+            }
+          },
+        );
       },
     );
   }

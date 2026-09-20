@@ -128,7 +128,15 @@ class ApiService {
     return jsonDecode(res.body);
   }
 
-  static Map<String, dynamic> _handle(http.Response res) {
+  static Future<bool> clientExiste(String clientId) async {
+    try {
+      final res = await http.get(Uri.parse("$baseUrl/api/client/$clientId/existe"));
+      final body = jsonDecode(res.body);
+      return body["existe"] == true;
+    } catch (_) {
+      return true; // en cas d'erreur réseau, on ne bloque pas l'utilisateur
+    }
+  }
     final body = jsonDecode(res.body);
     if (res.statusCode >= 400) {
       throw Exception(body["detail"] ?? "Erreur serveur");
