@@ -6,8 +6,7 @@ authentification admin, restrictions d'appareil, localisation quotidienne.
 import os
 import random
 import string
-import smtplib
-from email.mime.text import MIMEText
+import requests
 from datetime import datetime, timedelta, date
 from typing import Optional, Literal
 
@@ -27,10 +26,8 @@ load_dotenv()
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 JWT_SECRET = os.environ["JWT_SECRET"]
-SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))
-SMTP_USER = os.environ.get("SMTP_USER", "")
-SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "onboarding@resend.dev")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
@@ -93,17 +90,37 @@ def generate_otp() -> str:
     return "".join(random.choices(string.digits, k=6))
 
 def send_otp_email(email: str, otp: str):
-    if not SMTP_USER:
-        print(f"[DEV] OTP pour {email} : {otp}")
+    """
+    Envoie l'OTP via l'API HTTPS de Resend (pas de SMTP : Render Free
+    bloque les connexions SMTP sortantes, l'API HTTP fonctionne toujours).
+    Si RESEND_API_KEY n'est pas configurée, le code s'affiche dans les
+    logs serveur pour permettre de tester sans email réel.
+    """
+    if not RESEND_API_KEY:
+        print(f"[DEV] RESEND_API_KEY non configurée. OTP pour {email} : {otp}")
         return
-    msg = MIMEText(f"Votre code de vérification GGC PARTENAIRE est : {otp}\nValide 10 minutes.")
-    msg["Subject"] = "GGC PARTENAIRE - Code de vérification"
-    msg["From"] = SMTP_USER
-    msg["To"] = email
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-        server.starttls()
-        server.login(SMTP_USER, SMTP_PASSWORD)
-        server.send_message(msg)
+    try:
+        response = requests.post(
+            "https://api.resend.com/emails",
+            headers={
+                "Authorization": f"Bearer {RESEND_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "from": f"GGC PARTENAIRE <{RESEND_FROM_EMAIL}>",
+                "to": [email],
+                "subject": "GGC PARTENAIRE - Code de vérification",
+                "html": f"<p>Votre code de vérification est : <strong>{otp}</strong></p><p>Valide 10 minutes.</p>",
+            },
+            timeout=10,
+        )
+        if response.status_code >= 400:
+            print(f"[ERREUR RESEND] {response.status_code} : {response.text}")
+            print(f"[DEV FALLBACK] OTP pour {email} : {otp}")
+    except Exception as e:
+        # Ne bloque JAMAIS l'inscription si l'envoi d'email échoue.
+        print(f"[ERREUR EMAIL] Échec envoi OTP à {email} : {e}")
+        print(f"[DEV FALLBACK] OTP pour {email} : {otp}")
 
 def create_admin_jwt(admin_id: str, username: str, role: str) -> str:
     payload = {
