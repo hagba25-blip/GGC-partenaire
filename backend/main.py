@@ -13,7 +13,7 @@ from typing import Optional, Literal
 
 import bcrypt
 import jwt
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import FastAPI, HTTPException, Depends, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 from supabase import create_client, Client
@@ -137,7 +137,7 @@ def calculer_echeances(prix_total: float, mode: str, duree_mois: int):
 # ROUTES CLIENT — Inscription
 # ---------------------------------------------------------------------------
 @app.post("/api/client/inscription")
-def inscription(data: InscriptionRequest):
+def inscription(data: InscriptionRequest, request: Request):
     existing = supabase.table("clients").select("id").eq("email", data.email).execute()
     if existing.data:
         raise HTTPException(400, "Cet email est déjà inscrit.")
@@ -159,15 +159,26 @@ def inscription(data: InscriptionRequest):
 
     client_id = client.data[0]["id"]
 
-    supabase.table("devices").insert({
+    # Capture l'IP réelle du client à l'inscription (utile pour l'admin)
+    client_ip = request.client.host if request.client else None
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        client_ip = forwarded.split(",")[0].strip()
+
+    device = supabase.table("devices").insert({
         "client_id": client_id,
         "imei": data.imei,
         "modele": data.modele,
         "android_version": data.android_version,
+        "ip_address": client_ip,
     }).execute()
 
     send_otp_email(data.email, otp)
-    return {"client_id": client_id, "message": "Code de vérification envoyé par email."}
+    return {
+        "client_id": client_id,
+        "device_id": device.data[0]["id"],
+        "message": "Code de vérification envoyé par email.",
+    }
 
 @app.post("/api/client/verify-otp")
 def verify_otp(data: VerifyOtpRequest):

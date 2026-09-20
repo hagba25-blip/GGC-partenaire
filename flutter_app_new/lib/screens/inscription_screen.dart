@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import 'otp_screen.dart';
@@ -21,17 +23,52 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
   DateTime? dateNaissance;
   bool loading = false;
 
-  Future<String> _getImei() async {
+  Future<Map<String, String>> _getDeviceInfo() async {
     final info = DeviceInfoPlugin();
     final android = await info.androidInfo;
-    return android.id; // Android ID (l'IMEI réel nécessite une permission système spéciale)
+    return {
+      "imei": android.id,                              // identifiant unique stable
+      "modele": "${android.manufacturer} ${android.model}",
+      "android_version": "Android ${android.version.release}",
+    };
+  }
+
+  /// Demande la permission de localisation et envoie une première position
+  /// tout de suite après l'inscription, sans attendre le cycle de 24h.
+  Future<void> _envoyerPositionInitiale(String deviceId) async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return; // le client peut refuser ; la tâche quotidienne réessaiera
+      }
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+      );
+      await ApiService.updatePosition(
+        deviceId: deviceId,
+        lat: position.latitude,
+        lng: position.longitude,
+      );
+    } catch (_) {
+      // Pas bloquant : la tâche de fond quotidienne réessaiera
+    }
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate() || dateNaissance == null) return;
+    if (!emailCtrl.text.contains('@') || !emailCtrl.text.contains('.')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Veuillez saisir une adresse email valide.")),
+      );
+      return;
+    }
     setState(() => loading = true);
     try {
-      final imei = await _getImei();
+      final deviceInfo = await _getDeviceInfo();
       final res = await ApiService.inscription(
         nom: nomCtrl.text,
         prenom: prenomCtrl.text,
@@ -39,14 +76,27 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
         dateNaissance: dateNaissance!.toIso8601String().split('T')[0],
         email: emailCtrl.text,
         prixTotal: double.parse(prixCtrl.text),
-        imei: imei,
+        imei: deviceInfo["imei"]!,
+        modele: deviceInfo["modele"],
+        androidVersion: deviceInfo["android_version"],
       );
+
+      // Sauvegarde locale nécessaire pour la tâche de fond quotidienne
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('device_id', res["device_id"]);
+      await prefs.setString('client_id', res["client_id"]);
+
+      // Première position envoyée immédiatement (l'admin n'a pas à attendre 24h)
+      _envoyerPositionInitiale(res["device_id"]);
+
       if (!mounted) return;
       Navigator.push(context, MaterialPageRoute(
         builder: (_) => OtpScreen(clientId: res["client_id"], email: emailCtrl.text),
       ));
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst("Exception: ", ""))),
+      );
     } finally {
       setState(() => loading = false);
     }
@@ -79,7 +129,18 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
                 const SizedBox(height: 14),
                 _field(telCtrl, "Numéro de téléphone", type: TextInputType.phone),
                 const SizedBox(height: 14),
-                _field(emailCtrl, "Email", type: TextInputType.emailAddress),
+                TextFormField(
+                  controller: emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(labelText: "Email"),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return "Champ requis";
+                    if (!RegExp(r'^[\w\.\-]+@[\w\-]+\.[a-zA-Z]{2,}$').hasMatch(v)) {
+                      return "Email invalide (ex: nom@exemple.com)";
+                    }
+                    return null;
+                  },
+                ),
                 const SizedBox(height: 14),
                 _field(prixCtrl, "Prix total à payer (FCFA)", type: TextInputType.number),
                 const SizedBox(height: 14),
