@@ -34,6 +34,22 @@ class MainActivity : FlutterActivity() {
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
+                "isDeviceOwner" -> {
+                    result.success(GgcPolicyManager.isDeviceOwner(this))
+                }
+                "blockUninstall" -> {
+                    GgcPolicyManager.blockUninstall(this)
+                    result.success(null)
+                }
+                "unlockDevice" -> {
+                    // Appelé uniquement quand le backend confirme statut = "solde"
+                    GgcPolicyManager.unlockDevice(this)
+                    result.success(null)
+                }
+                "restrictNewAccounts" -> {
+                    GgcPolicyManager.restrictNewAccounts(this, true)
+                    result.success(null)
+                }
                 "enableDeviceAdmin" -> {
                     if (!devicePolicyManager.isAdminActive(adminComponent)) {
                         val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN)
@@ -65,27 +81,15 @@ class MainActivity : FlutterActivity() {
                     result.success(null)
                 }
                 "disableWifiAndData" -> {
-                    try {
-                        val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-                        @Suppress("DEPRECATION")
-                        wifiManager.isWifiEnabled = false
-                        if (devicePolicyManager.isAdminActive(adminComponent)) {
-                            devicePolicyManager.setUninstallBlocked(adminComponent, packageName, true)
-                        }
-                        result.success(null)
-                    } catch (e: Exception) {
-                        result.error("WIFI_ERROR", e.message, null)
+                    GgcPolicyManager.disableWifi(this)
+                    if (GgcPolicyManager.isDeviceOwner(this)) {
+                        GgcPolicyManager.blockUninstall(this)
                     }
+                    result.success(null)
                 }
                 "enableWifiAndData" -> {
-                    try {
-                        val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-                        @Suppress("DEPRECATION")
-                        wifiManager.isWifiEnabled = true
-                        result.success(null)
-                    } catch (e: Exception) {
-                        result.error("WIFI_ERROR", e.message, null)
-                    }
+                    GgcPolicyManager.enableWifi(this)
+                    result.success(null)
                 }
                 "disableSim" -> {
                     // Nécessite un profil Device Owner (déploiement entreprise / QR provisioning)

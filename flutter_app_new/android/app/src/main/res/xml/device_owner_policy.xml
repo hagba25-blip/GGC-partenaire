@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  GGC PARTENAIRE — politique Device Owner.
+  force-lock : verrouillage écran à distance
+  limit-password : politique de mot de passe
+  Aucune permission caméra/micro/contacts déclarée ici ni ailleurs.
+-->
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-policies>
+        <force-lock />
+        <limit-password />
+    </uses-policies>
+</device-admin>

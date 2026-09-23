@@ -4,6 +4,7 @@ import '../services/api_service.dart';
 import '../services/session_service.dart';
 import '../theme/app_theme.dart';
 import 'choix_paiement_screen.dart';
+import 'inscription_screen.dart';
 
 const String texteCgu = """
 CONDITIONS D'UTILISATION — GGC PARTENAIRE

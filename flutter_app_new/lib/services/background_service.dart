@@ -3,6 +3,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 import 'device_lock_service.dart';
+import 'notification_service.dart';
 
 /// Tâche de fond exécutée UNE FOIS PAR JOUR :
 /// 1. Envoie la position actuelle (pas de suivi continu)
@@ -21,6 +22,7 @@ void callbackDispatcher() {
 }
 
 Future<void> _runDailyCheck() async {
+  await NotificationService.init();
   final prefs = await SharedPreferences.getInstance();
   final deviceId = prefs.getString('device_id');
   if (deviceId == null) return;
@@ -43,6 +45,23 @@ Future<void> _runDailyCheck() async {
     } else {
       await DeviceLockService.leverRestrictions();
     }
+
+    // Libération réelle Device Owner quand le crédit est intégralement soldé
+    // (device_admin_actif passe à false côté backend une fois statut = "solde").
+    if (statut["device_admin_actif"] == false) {
+      await DeviceLockService.libererAppareil();
+    } else if (await DeviceLockService.estDeviceOwner()) {
+      await DeviceLockService.bloquerDesinstallation();
+    }
+
+    // Resynchronise les rappels de paiement locaux avec l'échéancier réel.
+    try {
+      final clientId = prefs.getString('client_id');
+      if (clientId != null) {
+        final echeances = await ApiService.getEcheances(clientId);
+        await NotificationService.reprogrammerRappels(echeances);
+      }
+    } catch (_) {}
   } catch (e) {
     // Échec silencieux : pas de connexion, réessai au prochain cycle
   }

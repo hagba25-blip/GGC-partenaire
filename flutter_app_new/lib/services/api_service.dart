@@ -137,6 +137,8 @@ class ApiService {
       return true; // en cas d'erreur réseau, on ne bloque pas l'utilisateur
     }
   }
+
+  static Map<String, dynamic> _handle(http.Response res) {
     final body = jsonDecode(res.body);
     if (res.statusCode >= 400) {
       throw Exception(body["detail"] ?? "Erreur serveur");

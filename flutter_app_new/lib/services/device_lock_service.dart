@@ -43,4 +43,31 @@ class DeviceLockService {
   static Future<void> desactiverProtectionDesinstallation() async {
     await _channel.invokeMethod('disableDeviceAdmin');
   }
+
+  /// Vrai si l'app est enrôlée en tant que Device Owner (provisioning
+  /// initial réussi). Si false, le blocage de désinstallation réel n'est
+  /// pas disponible — seul le Device Admin simple (verrouillage écran) l'est.
+  static Future<bool> estDeviceOwner() async {
+    try {
+      return await _channel.invokeMethod('isDeviceOwner') ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// Bloque réellement la désinstallation via setUninstallBlocked()
+  /// (nécessite Device Owner — voir estDeviceOwner()).
+  static Future<void> bloquerDesinstallation() async {
+    try {
+      await _channel.invokeMethod('blockUninstall');
+    } on PlatformException catch (_) {}
+  }
+
+  /// Libère l'appareil : à appeler uniquement quand le backend confirme
+  /// que le client a intégralement soldé son crédit.
+  static Future<void> libererAppareil() async {
+    try {
+      await _channel.invokeMethod('unlockDevice');
+    } on PlatformException catch (_) {}
+  }
 }

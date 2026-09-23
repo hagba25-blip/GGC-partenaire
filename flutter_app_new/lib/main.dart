@@ -8,9 +8,12 @@ import 'screens/echeancier_screen.dart';
 import 'services/background_service.dart';
 import 'services/session_service.dart';
 import 'services/api_service.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService.init();
+  await NotificationService.requestPermissions();
   await BackgroundService.init(); // lance la tâche quotidienne (position + statut)
   runApp(const GgcPartenaireApp());
 }

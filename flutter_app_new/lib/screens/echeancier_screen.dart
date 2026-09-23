@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
+import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import 'inscription_screen.dart';
 
@@ -47,6 +48,9 @@ class _EcheancierScreenState extends State<EcheancierScreen> with WidgetsBinding
       echeances = data;
       loading = false;
     });
+    // Reprogramme les rappels locaux à chaque chargement, pour rester
+    // synchronisé avec les paiements effectués entre-temps.
+    NotificationService.reprogrammerRappels(data);
   }
 
   Future<void> _payer(Map e) async {
