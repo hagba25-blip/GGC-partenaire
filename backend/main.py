@@ -14,6 +14,7 @@ import bcrypt
 import jwt
 from fastapi import FastAPI, HTTPException, Depends, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, EmailStr
 from supabase import create_client, Client
 from dotenv import load_dotenv
@@ -60,6 +61,9 @@ class VerifyOtpRequest(BaseModel):
     otp_code: str
 
 class ResendOtpRequest(BaseModel):
+    email: EmailStr
+
+class ConnexionRequest(BaseModel):
     email: EmailStr
 
 class ChoixPaiementRequest(BaseModel):
@@ -227,6 +231,44 @@ def verify_otp(data: VerifyOtpRequest):
     }).eq("id", client["id"]).execute()
 
     return {"message": "Email vérifié avec succès.", "client_id": client["id"]}
+
+@app.post("/api/client/connexion")
+def connexion(data: ConnexionRequest):
+    """
+    Reconnexion d'un client déjà inscrit (après réinstallation de l'app,
+    changement de téléphone de test, etc.). Renvoie un nouvel OTP par
+    email, ainsi que l'étape exacte où reprendre une fois vérifié.
+    """
+    client_res = supabase.table("clients").select("*").eq("email", data.email).execute()
+    if not client_res.data:
+        raise HTTPException(404, "Aucun compte trouvé avec cet email.")
+    client = client_res.data[0]
+
+    device_res = supabase.table("devices").select("id").eq("client_id", client["id"]).execute()
+    device_id = device_res.data[0]["id"] if device_res.data else None
+
+    # Détermine où l'app doit reprendre une fois l'OTP vérifié
+    if not client["cgu_acceptees"]:
+        stage = "cgu"
+    else:
+        echeances_res = supabase.table("echeances").select("id").eq("client_id", client["id"]).execute()
+        stage = "echeancier" if echeances_res.data else "paiement"
+
+    otp = generate_otp()
+    supabase.table("clients").update({
+        "otp_code": otp,
+        "otp_expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
+        "email_verified": False,  # revérifié à chaque connexion, par sécurité
+    }).eq("id", client["id"]).execute()
+
+    send_otp_email(data.email, otp)
+
+    return {
+        "client_id": client["id"],
+        "device_id": device_id,
+        "stage_apres_verification": stage,
+        "message": "Code de vérification envoyé.",
+    }
 
 @app.post("/api/client/resend-otp")
 def resend_otp(data: ResendOtpRequest):
@@ -585,3 +627,16 @@ def verifier_retards():
 @app.get("/")
 def health():
     return {"status": "ok", "project": "GGC PARTENAIRE"}
+
+@app.get("/app/ggc-partenaire.apk")
+def download_apk():
+    """
+    Sert l'APK signé pour le provisioning Device Owner (QR code à la vente).
+    Placez le fichier app-release.apk dans backend/static/ avant déploiement.
+    """
+    path = "static/app-release.apk"
+    if not os.path.exists(path):
+        raise HTTPException(404, "APK non disponible. Déposez-le dans backend/static/.")
+    return FileResponse(path, media_type="application/vnd.android.package-archive",
+                         filename="ggc-partenaire.apk")
+    

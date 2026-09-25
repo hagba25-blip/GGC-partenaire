@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
 import '../services/notification_service.dart';
@@ -25,6 +27,7 @@ class _EcheancierScreenState extends State<EcheancierScreen> with WidgetsBinding
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _load();
+    _envoyerPositionActuelle();
   }
 
   @override
@@ -39,7 +42,29 @@ class _EcheancierScreenState extends State<EcheancierScreen> with WidgetsBinding
     // après avoir terminé (ou abandonné) le paiement dans le navigateur.
     if (state == AppLifecycleState.resumed) {
       _load();
+      _envoyerPositionActuelle();
     }
+  }
+
+  Future<void> _envoyerPositionActuelle() async {
+    // La tâche de fond quotidienne (WorkManager) est souvent tuée par
+    // l'économiseur de batterie Android en usage réel. On rafraîchit donc
+    // aussi la position à chaque retour au premier plan, pour rester fiable.
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final deviceId = prefs.getString('device_id');
+      if (deviceId == null) return;
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        return;
+      }
+      final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.medium);
+      await ApiService.updatePosition(deviceId: deviceId, lat: position.latitude, lng: position.longitude);
+    } catch (_) {}
   }
 
   Future<void> _load() async {

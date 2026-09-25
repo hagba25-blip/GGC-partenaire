@@ -7,6 +7,7 @@ import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../services/session_service.dart';
 import 'otp_screen.dart';
+import 'connexion_screen.dart';
 
 class InscriptionScreen extends StatefulWidget {
   const InscriptionScreen({super.key});
@@ -152,6 +153,13 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
                 loading
                     ? const Center(child: CircularProgressIndicator())
                     : ElevatedButton(onPressed: _submit, child: const Text("S'inscrire")),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => const ConnexionScreen(),
+                  )),
+                  child: const Text("Déjà inscrit ? Se connecter"),
+                ),
               ],
             ),
           ),
