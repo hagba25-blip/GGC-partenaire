@@ -11,6 +11,8 @@ flutter_app_new/.flutter-plugins-dependencies
 flutter_app_new/android/.gradle/
 flutter_app_new/android/app/build/
 flutter_app_new/android/local.properties
+flutter_app_new/android/key.properties
+flutter_app_new/**/*.jks
 flutter_app_new/**/hs_err_pid*.log
 flutter_app_new/ios/Pods/
 flutter_app_new/ios/Flutter/Flutter.framework/
