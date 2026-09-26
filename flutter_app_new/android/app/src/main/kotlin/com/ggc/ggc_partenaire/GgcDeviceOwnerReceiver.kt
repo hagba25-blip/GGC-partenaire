@@ -1,4 +1,4 @@
-package com.ggc.partenaire
+package com.ggc.ggc_partenaire
 
 import android.app.admin.DeviceAdminReceiver
 import android.app.admin.DevicePolicyManager

@@ -1,4 +1,4 @@
-package com.ggc.partenaire
+package com.ggc.ggc_partenaire
 
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
