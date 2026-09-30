@@ -5,7 +5,9 @@ class AppColors {
   static const Color skyBlueDark = Color(0xFF0288D1);
   static const Color white = Color(0xFFFFFFFF);
   static const Color background = Color(0xFFF5FBFF);
+  static const Color skyLight = Color(0xFFE1F5FE);
   static const Color textDark = Color(0xFF1A2A3A);
+  static const Color textMuted = Color(0xFF6B8299);
   static const Color danger = Color(0xFFE53935);
   static const Color success = Color(0xFF43A047);
 }

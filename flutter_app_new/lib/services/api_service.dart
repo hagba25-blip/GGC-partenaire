@@ -119,6 +119,41 @@ class ApiService {
     return body["checkout_url"];
   }
 
+  static Future<List<dynamic>> getProduits() async {
+    final res = await http.get(Uri.parse("$baseUrl/api/produits"));
+    return jsonDecode(res.body);
+  }
+
+  static Future<List<dynamic>> getOffres() async {
+    final res = await http.get(Uri.parse("$baseUrl/api/offres"));
+    return jsonDecode(res.body);
+  }
+
+  static Future<void> signalerInteret({
+    required String clientId,
+    required String type,
+    required String itemId,
+    required String itemNom,
+  }) async {
+    final res = await http.post(
+      Uri.parse("$baseUrl/api/client/interet"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({
+        "client_id": clientId, "type": type, "item_id": itemId, "item_nom": itemNom,
+      }),
+    );
+    _handle(res);
+  }
+
+  static Future<Map<String, dynamic>> getNotifications(String clientId) async {
+    final res = await http.get(Uri.parse("$baseUrl/api/client/$clientId/notifications"));
+    return jsonDecode(res.body);
+  }
+
+  static Future<void> marquerNotificationLue(String interetId) async {
+    await http.post(Uri.parse("$baseUrl/api/client/notifications/$interetId/marquer-lu"));
+  }
+
   static Future<void> updatePosition({
     required String deviceId,
     required double lat,

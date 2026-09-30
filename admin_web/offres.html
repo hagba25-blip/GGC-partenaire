@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GGC PARTENAIRE — Offres</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="dashboard">
+    <aside class="sidebar">
+      <div class="logo">GGC PARTENAIRE</div>
+      <nav>
+        <a href="dashboard.html">📊 Tableau de bord</a>
+        <a href="clients.html">👥 Clients</a>
+        <a href="carte.html">🗺️ Carte des appareils</a>
+        <a href="produits.html">🛍️ Produits</a>
+        <a href="offres.html" class="active">🏷️ Offres</a>
+        <a href="interets.html">🔔 Intérêts clients</a>
+        <a href="#" onclick="logout()">🚪 Déconnexion</a>
+      </nav>
+    </aside>
+
+    <main class="main-content">
+      <div class="topbar">
+        <h2>Offres</h2>
+        <span class="admin-badge" id="adminBadge"></span>
+      </div>
+
+      <button class="btn-primary" style="width:auto;padding:12px 24px;margin-bottom:20px;" onclick="ouvrirFormulaire()">
+        + Ajouter une offre
+      </button>
+
+      <div class="table-card fade-in">
+        <table>
+          <thead>
+            <tr>
+              <th>Titre</th>
+              <th>Description</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="offresBody"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-overlay" id="modalOverlay" style="display:none;">
+    <div class="modal-box" style="position:relative;">
+      <button class="btn-close" onclick="fermerFormulaire()">✕</button>
+      <h3>Ajouter une offre</h3>
+      <form id="offreForm">
+        <div class="input-group">
+          <label>Titre</label>
+          <input type="text" id="titre" required placeholder="ex: Aide à retrouver ton téléphone perdu">
+        </div>
+        <div class="input-group">
+          <label>Description</label>
+          <input type="text" id="description" placeholder="ex: En cas de perte, retrouve-le facilement">
+        </div>
+        <div class="input-group">
+          <label>Image (URL, optionnel)</label>
+          <input type="text" id="image">
+        </div>
+        <button type="submit" class="btn-primary">Enregistrer</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="offres.js"></script>
+</body>
+</html>

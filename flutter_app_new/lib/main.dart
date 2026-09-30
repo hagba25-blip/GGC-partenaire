@@ -5,6 +5,7 @@ import 'screens/otp_screen.dart';
 import 'screens/cgu_screen.dart';
 import 'screens/choix_paiement_screen.dart';
 import 'screens/echeancier_screen.dart';
+import 'screens/main_nav_screen.dart';
 import 'services/background_service.dart';
 import 'services/session_service.dart';
 import 'services/api_service.dart';

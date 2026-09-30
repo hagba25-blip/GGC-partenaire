@@ -96,6 +96,27 @@ class CreerPaiementRequest(BaseModel):
     client_id: str
     echeance_id: str
 
+class InteretRequest(BaseModel):
+    client_id: str
+    type: Literal["produit", "offre"]
+    item_id: str
+    item_nom: str
+
+class RepondreInteretRequest(BaseModel):
+    message: str
+
+class ProduitRequest(BaseModel):
+    nom: str
+    description: Optional[str] = None
+    prix_normal: float
+    prix_tontine: Optional[float] = None
+    images: list[str] = []
+
+class OffreRequest(BaseModel):
+    titre: str
+    description: Optional[str] = None
+    image: Optional[str] = None
+
 # ---------------------------------------------------------------------------
 # UTILITAIRES
 # ---------------------------------------------------------------------------
@@ -627,6 +648,113 @@ def verifier_retards():
 @app.get("/")
 def health():
     return {"status": "ok", "project": "GGC PARTENAIRE"}
+
+# ---------------------------------------------------------------------------
+# ROUTES CLIENT — Produits, offres, intérêts, notifications
+# ---------------------------------------------------------------------------
+@app.get("/api/produits")
+def liste_produits():
+    res = supabase.table("produits").select("*").eq("actif", True).order("created_at", desc=True).execute()
+    return res.data
+
+@app.get("/api/offres")
+def liste_offres():
+    res = supabase.table("offres").select("*").eq("actif", True).order("created_at", desc=True).execute()
+    return res.data
+
+@app.post("/api/client/interet")
+def signaler_interet(data: InteretRequest):
+    """Le client clique 'Intéressé' sur un produit ou une offre."""
+    res = supabase.table("interets").insert({
+        "client_id": data.client_id,
+        "type": data.type,
+        "item_id": data.item_id,
+        "item_nom": data.item_nom,
+    }).execute()
+    return {"message": "Intérêt enregistré.", "interet": res.data[0]}
+
+@app.get("/api/client/{client_id}/notifications")
+def notifications_client(client_id: str):
+    """Historique des intérêts du client + réponses admin, pour l'onglet Notifications."""
+    res = supabase.table("interets").select("*").eq("client_id", client_id).order("created_at", desc=True).execute()
+    non_lues = sum(1 for i in res.data if i["repondu"] and not i["lu_par_client"])
+    return {"notifications": res.data, "non_lues": non_lues}
+
+@app.post("/api/client/notifications/{interet_id}/marquer-lu")
+def marquer_notification_lue(interet_id: str):
+    supabase.table("interets").update({"lu_par_client": True}).eq("id", interet_id).execute()
+    return {"message": "Marqué comme lu."}
+
+# ---------------------------------------------------------------------------
+# ROUTES ADMIN — Gestion produits, offres, intérêts clients
+# ---------------------------------------------------------------------------
+@app.get("/api/admin/produits")
+def admin_liste_produits(admin=Depends(get_current_admin)):
+    res = supabase.table("produits").select("*").order("created_at", desc=True).execute()
+    return res.data
+
+@app.post("/api/admin/produits")
+def admin_creer_produit(data: ProduitRequest, admin=Depends(get_current_admin)):
+    res = supabase.table("produits").insert({
+        "nom": data.nom,
+        "description": data.description,
+        "prix_normal": data.prix_normal,
+        "prix_tontine": data.prix_tontine,
+        "images": data.images,
+    }).execute()
+    return res.data[0]
+
+@app.put("/api/admin/produits/{produit_id}")
+def admin_modifier_produit(produit_id: str, data: ProduitRequest, admin=Depends(get_current_admin)):
+    supabase.table("produits").update({
+        "nom": data.nom,
+        "description": data.description,
+        "prix_normal": data.prix_normal,
+        "prix_tontine": data.prix_tontine,
+        "images": data.images,
+    }).eq("id", produit_id).execute()
+    return {"message": "Produit modifié."}
+
+@app.delete("/api/admin/produits/{produit_id}")
+def admin_supprimer_produit(produit_id: str, admin=Depends(get_current_admin)):
+    supabase.table("produits").update({"actif": False}).eq("id", produit_id).execute()
+    return {"message": "Produit désactivé."}
+
+@app.get("/api/admin/offres")
+def admin_liste_offres(admin=Depends(get_current_admin)):
+    res = supabase.table("offres").select("*").order("created_at", desc=True).execute()
+    return res.data
+
+@app.post("/api/admin/offres")
+def admin_creer_offre(data: OffreRequest, admin=Depends(get_current_admin)):
+    res = supabase.table("offres").insert({
+        "titre": data.titre,
+        "description": data.description,
+        "image": data.image,
+    }).execute()
+    return res.data[0]
+
+@app.delete("/api/admin/offres/{offre_id}")
+def admin_supprimer_offre(offre_id: str, admin=Depends(get_current_admin)):
+    supabase.table("offres").update({"actif": False}).eq("id", offre_id).execute()
+    return {"message": "Offre désactivée."}
+
+@app.get("/api/admin/interets")
+def admin_liste_interets(admin=Depends(get_current_admin)):
+    """Liste des clients intéressés par produits/offres, pour le tableau de bord admin."""
+    res = supabase.table("interets").select("*, clients(nom, prenom, telephone, email)").order("created_at", desc=True).execute()
+    return res.data
+
+@app.post("/api/admin/interets/{interet_id}/repondre")
+def admin_repondre_interet(interet_id: str, data: RepondreInteretRequest, admin=Depends(get_current_admin)):
+    """L'admin répond à un client intéressé ; ça déclenche une notification côté client."""
+    supabase.table("interets").update({
+        "message_admin": data.message,
+        "repondu": True,
+        "repondu_at": datetime.now(timezone.utc).isoformat(),
+        "lu_par_client": False,
+    }).eq("id", interet_id).execute()
+    return {"message": "Réponse envoyée au client."}
 
 @app.get("/app/ggc-partenaire.apk")
 def download_apk():

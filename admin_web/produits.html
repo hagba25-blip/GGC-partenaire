@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GGC PARTENAIRE — Produits</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="dashboard">
+    <aside class="sidebar">
+      <div class="logo">GGC PARTENAIRE</div>
+      <nav>
+        <a href="dashboard.html">📊 Tableau de bord</a>
+        <a href="clients.html">👥 Clients</a>
+        <a href="carte.html">🗺️ Carte des appareils</a>
+        <a href="produits.html" class="active">🛍️ Produits</a>
+        <a href="offres.html">🏷️ Offres</a>
+        <a href="interets.html">🔔 Intérêts clients</a>
+        <a href="#" onclick="logout()">🚪 Déconnexion</a>
+      </nav>
+    </aside>
+
+    <main class="main-content">
+      <div class="topbar">
+        <h2>Produits</h2>
+        <span class="admin-badge" id="adminBadge"></span>
+      </div>
+
+      <button class="btn-primary" style="width:auto;padding:12px 24px;margin-bottom:20px;" onclick="ouvrirFormulaire()">
+        + Ajouter un produit
+      </button>
+
+      <div class="table-card fade-in">
+        <table>
+          <thead>
+            <tr>
+              <th>Nom</th>
+              <th>Prix normal</th>
+              <th>Prix tontine</th>
+              <th>Images</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="produitsBody"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-overlay" id="modalOverlay" style="display:none;">
+    <div class="modal-box" style="position:relative;">
+      <button class="btn-close" onclick="fermerFormulaire()">✕</button>
+      <h3 id="modalTitre">Ajouter un produit</h3>
+      <form id="produitForm">
+        <input type="hidden" id="produitId">
+        <div class="input-group">
+          <label>Nom du produit</label>
+          <input type="text" id="nom" required>
+        </div>
+        <div class="input-group">
+          <label>Description</label>
+          <input type="text" id="description">
+        </div>
+        <div class="input-group">
+          <label>Prix normal (FCFA)</label>
+          <input type="number" id="prixNormal" required>
+        </div>
+        <div class="input-group">
+          <label>Prix tontine (FCFA, optionnel)</label>
+          <input type="number" id="prixTontine">
+        </div>
+        <div class="input-group">
+          <label>Images (une URL par ligne)</label>
+          <textarea id="images" rows="4" style="width:100%;padding:12px 14px;border:1.5px solid #E0EEF5;border-radius:12px;font-size:14px;"></textarea>
+        </div>
+        <button type="submit" class="btn-primary">Enregistrer</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="produits.js"></script>
+</body>
+</html>

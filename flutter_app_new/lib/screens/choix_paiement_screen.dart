@@ -3,7 +3,7 @@ import 'package:animate_do/animate_do.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
 import '../theme/app_theme.dart';
-import 'echeancier_screen.dart';
+import 'main_nav_screen.dart';
 import 'inscription_screen.dart';
 
 class ChoixPaiementScreen extends StatefulWidget {
@@ -33,7 +33,7 @@ class _ChoixPaiementScreenState extends State<ChoixPaiementScreen> {
       await SessionService.markPaiementChoisi();
       if (!mounted) return;
       Navigator.pushReplacement(context, MaterialPageRoute(
-        builder: (_) => EcheancierScreen(
+        builder: (_) => MainNavScreen(
           clientId: widget.clientId,
           montantEcheance: res["montant_echeance"].toDouble(),
         ),

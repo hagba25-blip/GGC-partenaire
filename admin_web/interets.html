@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GGC PARTENAIRE — Intérêts clients</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="dashboard">
+    <aside class="sidebar">
+      <div class="logo">GGC PARTENAIRE</div>
+      <nav>
+        <a href="dashboard.html">📊 Tableau de bord</a>
+        <a href="clients.html">👥 Clients</a>
+        <a href="carte.html">🗺️ Carte des appareils</a>
+        <a href="produits.html">🛍️ Produits</a>
+        <a href="offres.html">🏷️ Offres</a>
+        <a href="interets.html" class="active">🔔 Intérêts clients</a>
+        <a href="#" onclick="logout()">🚪 Déconnexion</a>
+      </nav>
+    </aside>
+
+    <main class="main-content">
+      <div class="topbar">
+        <h2>Clients intéressés</h2>
+        <span class="admin-badge" id="adminBadge"></span>
+      </div>
+
+      <div class="table-card fade-in">
+        <table>
+          <thead>
+            <tr>
+              <th>Client</th>
+              <th>Téléphone</th>
+              <th>Type</th>
+              <th>Article</th>
+              <th>Statut</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="interetsBody"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-overlay" id="modalOverlay" style="display:none;">
+    <div class="modal-box" style="position:relative;">
+      <button class="btn-close" onclick="fermerReponse()">✕</button>
+      <h3>Répondre au client</h3>
+      <p id="interetContexte" style="color:#6B8299;margin-bottom:16px;"></p>
+      <div class="input-group">
+        <label>Votre message</label>
+        <textarea id="messageReponse" rows="4" style="width:100%;padding:12px 14px;border:1.5px solid #E0EEF5;border-radius:12px;font-size:14px;" placeholder="ex: Merci pour votre intérêt ! Ce produit est disponible, contactez-nous au..."></textarea>
+      </div>
+      <button class="btn-primary" onclick="envoyerReponse()">Envoyer la réponse</button>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="interets.js"></script>
+</body>
+</html>
