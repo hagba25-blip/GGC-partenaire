@@ -21,6 +21,7 @@ class MainNavScreen extends StatefulWidget {
 class _MainNavScreenState extends State<MainNavScreen> {
   int _index = 0;
   int _notifNonLues = 0;
+  int _notifRefreshTrigger = 0;
 
   @override
   void initState() {
@@ -36,7 +37,10 @@ class _MainNavScreenState extends State<MainNavScreen> {
   }
 
   void allerNotifications() {
-    setState(() => _index = 2);
+    setState(() {
+      _index = 2;
+      _notifRefreshTrigger++;
+    });
     _chargerBadge();
   }
 
@@ -45,7 +49,11 @@ class _MainNavScreenState extends State<MainNavScreen> {
     final screens = [
       EcheancierScreen(clientId: widget.clientId, montantEcheance: widget.montantEcheance),
       ProduitsScreen(clientId: widget.clientId, onInteretEnvoye: allerNotifications),
-      NotificationsScreen(clientId: widget.clientId, onOuvert: _chargerBadge),
+      NotificationsScreen(
+        clientId: widget.clientId,
+        onOuvert: _chargerBadge,
+        refreshTrigger: _notifRefreshTrigger,
+      ),
       OffresScreen(clientId: widget.clientId, onInteretEnvoye: allerNotifications),
     ];
 
@@ -54,7 +62,10 @@ class _MainNavScreenState extends State<MainNavScreen> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) {
-          setState(() => _index = i);
+          setState(() {
+            _index = i;
+            if (i == 2) _notifRefreshTrigger++;
+          });
           if (i == 2) _chargerBadge();
         },
         backgroundColor: AppColors.white,

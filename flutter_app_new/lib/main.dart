@@ -105,7 +105,7 @@ class _EcheancierLoader extends StatelessWidget {
         }
         final echeances = snapshot.data as List;
         final montant = echeances.isNotEmpty ? (echeances[0]["montant"] as num).toDouble() : 0.0;
-        return EcheancierScreen(clientId: clientId, montantEcheance: montant);
+        return MainNavScreen(clientId: clientId, montantEcheance: montant);
       },
     );
   }

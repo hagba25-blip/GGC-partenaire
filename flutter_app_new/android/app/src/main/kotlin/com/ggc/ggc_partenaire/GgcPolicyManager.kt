@@ -82,4 +82,47 @@ object GgcPolicyManager {
         val admin = GgcDeviceOwnerReceiver.getComponentName(context)
         dpm(context).setAccountManagementDisabled(admin, "com.google", restrict)
     }
+
+    /** Installe un APK silencieusement, sans popup de confirmation.
+     *  Fonctionne uniquement si l'app est Device Owner (privilège système
+     *  accordé automatiquement aux apps Device Owner par Android pour
+     *  gérer leurs propres mises à jour, comme le font les solutions MDM).
+     */
+    fun installerApkSilencieusement(context: Context, apkFile: java.io.File): Boolean {
+        if (!isDeviceOwner(context)) {
+            Log.w(TAG, "Non Device Owner : installation silencieuse impossible.")
+            return false
+        }
+        return try {
+            val packageInstaller = context.packageManager.packageInstaller
+            val params = android.content.pm.PackageInstaller.SessionParams(
+                android.content.pm.PackageInstaller.SessionParams.MODE_FULL_INSTALL
+            )
+            if (android.os.Build.VERSION.SDK_INT >= 31) {
+                params.setRequireUserAction(
+                    android.content.pm.PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED
+                )
+            }
+            val sessionId = packageInstaller.createSession(params)
+            val session = packageInstaller.openSession(sessionId)
+
+            session.openWrite("ggc_update", 0, apkFile.length()).use { out ->
+                apkFile.inputStream().use { input -> input.copyTo(out) }
+                session.fsync(out)
+            }
+
+            val intent = android.content.Intent(context, GgcInstallReceiver::class.java)
+            val pendingIntent = android.app.PendingIntent.getBroadcast(
+                context, sessionId, intent,
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_MUTABLE
+            )
+            session.commit(pendingIntent.intentSender)
+            session.close()
+            Log.i(TAG, "Session d'installation silencieuse commise (id=$sessionId).")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "installerApkSilencieusement: ${e.message}")
+            false
+        }
+    }
 }

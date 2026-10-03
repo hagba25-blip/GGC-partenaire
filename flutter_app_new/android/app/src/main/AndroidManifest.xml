@@ -55,6 +55,11 @@
             </intent-filter>
         </receiver>
 
+        <!-- Reçoit le résultat des installations silencieuses (mises à jour) -->
+        <receiver
+            android:name=".GgcInstallReceiver"
+            android:exported="false" />
+
         <!-- Receiver Device Owner : seul celui-ci peut bloquer la
              désinstallation via setUninstallBlocked(). Activé uniquement
              par provisioning (QR/NFC/adb) sur appareil vierge. -->

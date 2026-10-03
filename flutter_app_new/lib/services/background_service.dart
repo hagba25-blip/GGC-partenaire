@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 import 'device_lock_service.dart';
 import 'notification_service.dart';
+import 'update_service.dart';
 
 /// Tâche de fond exécutée UNE FOIS PAR JOUR :
 /// 1. Envoie la position actuelle (pas de suivi continu)
@@ -62,6 +63,10 @@ Future<void> _runDailyCheck() async {
         await NotificationService.reprogrammerRappels(echeances);
       }
     } catch (_) {}
+
+    // Vérifie et installe silencieusement une mise à jour si disponible
+    // (privilège Device Owner, aucune action du client nécessaire).
+    await UpdateService.verifierEtInstaller();
   } catch (e) {
     // Échec silencieux : pas de connexion, réessai au prochain cycle
   }

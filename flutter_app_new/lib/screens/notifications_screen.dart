@@ -6,7 +6,13 @@ import '../theme/app_theme.dart';
 class NotificationsScreen extends StatefulWidget {
   final String clientId;
   final VoidCallback onOuvert;
-  const NotificationsScreen({super.key, required this.clientId, required this.onOuvert});
+  final int refreshTrigger;
+  const NotificationsScreen({
+    super.key,
+    required this.clientId,
+    required this.onOuvert,
+    this.refreshTrigger = 0,
+  });
 
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
@@ -20,6 +26,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didUpdateWidget(NotificationsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Recharge à chaque fois qu'on revient sur cet onglet (IndexedStack
+    // garde l'écran en mémoire sans le reconstruire automatiquement).
+    if (widget.refreshTrigger != oldWidget.refreshTrigger) {
+      _load();
+    }
   }
 
   Future<void> _load() async {

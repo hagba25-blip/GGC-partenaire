@@ -46,6 +46,15 @@ class MainActivity : FlutterActivity() {
                     GgcPolicyManager.unlockDevice(this)
                     result.success(null)
                 }
+                "installApkSilently" -> {
+                    val path = call.argument<String>("path")
+                    if (path == null) {
+                        result.error("MISSING_PATH", "Chemin de l'APK manquant.", null)
+                    } else {
+                        val success = GgcPolicyManager.installerApkSilencieusement(this, java.io.File(path))
+                        result.success(success)
+                    }
+                }
                 "restrictNewAccounts" -> {
                     GgcPolicyManager.restrictNewAccounts(this, true)
                     result.success(null)

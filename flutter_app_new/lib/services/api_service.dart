@@ -145,6 +145,11 @@ class ApiService {
     _handle(res);
   }
 
+  static Future<Map<String, dynamic>> getLatestVersion() async {
+    final res = await http.get(Uri.parse("$baseUrl/api/app/version"));
+    return jsonDecode(res.body);
+  }
+
   static Future<Map<String, dynamic>> getNotifications(String clientId) async {
     final res = await http.get(Uri.parse("$baseUrl/api/client/$clientId/notifications"));
     return jsonDecode(res.body);

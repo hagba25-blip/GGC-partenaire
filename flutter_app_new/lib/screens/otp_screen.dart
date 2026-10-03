@@ -7,7 +7,7 @@ import '../theme/app_theme.dart';
 import 'cgu_screen.dart';
 import 'inscription_screen.dart';
 import 'choix_paiement_screen.dart';
-import 'echeancier_screen.dart';
+import 'main_nav_screen.dart';
 
 class OtpScreen extends StatefulWidget {
   final String clientId;
@@ -72,7 +72,7 @@ class _OtpScreenState extends State<OtpScreen> {
             final echeances = await ApiService.getEcheances(widget.clientId);
             final montant = echeances.isNotEmpty ? (echeances[0]["montant"] as num).toDouble() : 0.0;
             Navigator.pushReplacement(context, MaterialPageRoute(
-              builder: (_) => EcheancierScreen(clientId: widget.clientId, montantEcheance: montant),
+              builder: (_) => MainNavScreen(clientId: widget.clientId, montantEcheance: montant),
             ));
             break;
         }

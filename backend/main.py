@@ -31,6 +31,7 @@ RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "onboarding@resend.dev")
 LEEKPAY_SECRET_KEY = os.environ.get("LEEKPAY_SECRET_KEY", "")
 LEEKPAY_PUBLIC_KEY = os.environ.get("LEEKPAY_PUBLIC_KEY", "")
+PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "https://ggc-partenaire.onrender.com")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
@@ -116,6 +117,12 @@ class OffreRequest(BaseModel):
     titre: str
     description: Optional[str] = None
     image: Optional[str] = None
+
+class AppVersionRequest(BaseModel):
+    version_code: int
+    version_name: str
+    checksum: str
+    notes: Optional[str] = None
 
 # ---------------------------------------------------------------------------
 # UTILITAIRES
@@ -759,12 +766,46 @@ def admin_repondre_interet(interet_id: str, data: RepondreInteretRequest, admin=
 @app.get("/app/ggc-partenaire.apk")
 def download_apk():
     """
-    Sert l'APK signé pour le provisioning Device Owner (QR code à la vente).
-    Placez le fichier app-release.apk dans backend/static/ avant déploiement.
+    Sert l'APK signé pour le provisioning Device Owner (QR code à la vente)
+    ET pour les mises à jour silencieuses. Placez le fichier app-release.apk
+    dans backend/static/ avant déploiement (toujours la dernière version).
     """
     path = "static/app-release.apk"
     if not os.path.exists(path):
         raise HTTPException(404, "APK non disponible. Déposez-le dans backend/static/.")
     return FileResponse(path, media_type="application/vnd.android.package-archive",
                          filename="ggc-partenaire.apk")
-    
+
+@app.get("/api/app/version")
+def derniere_version():
+    """
+    Appelée par l'app (tâche de fond quotidienne) pour savoir si une
+    mise à jour est disponible. Publique, pas besoin d'authentification.
+    """
+    res = supabase.table("app_version").select("*").eq("id", 1).execute()
+    if not res.data:
+        raise HTTPException(404, "Aucune version publiée.")
+    v = res.data[0]
+    return {
+        "version_code": v["version_code"],
+        "version_name": v["version_name"],
+        "checksum": v["checksum"],
+        "apk_url": f"{PUBLIC_BASE_URL}/app/ggc-partenaire.apk",
+        "notes": v.get("notes"),
+    }
+
+@app.post("/api/admin/app-version")
+def publier_version(data: AppVersionRequest, admin=Depends(get_current_admin)):
+    """
+    Enregistre les métadonnées de la nouvelle version après avoir déposé
+    le nouvel APK dans backend/static/. Utilisez publish_version.py pour
+    automatiser les deux étapes (copie APK + appel de cette route).
+    """
+    supabase.table("app_version").update({
+        "version_code": data.version_code,
+        "version_name": data.version_name,
+        "checksum": data.checksum,
+        "notes": data.notes,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }).eq("id", 1).execute()
+    return {"message": "Nouvelle version publiée."}
