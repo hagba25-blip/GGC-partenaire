@@ -3,6 +3,7 @@ package com.ggc.ggc_partenaire
 import android.app.admin.DevicePolicyManager
 import android.content.Context
 import android.net.wifi.WifiManager
+import android.os.UserManager
 import android.util.Log
 
 /**
@@ -74,6 +75,55 @@ object GgcPolicyManager {
     fun lockScreenNow(context: Context) {
         if (!isDeviceOwner(context)) return
         dpm(context).lockNow()
+    }
+
+    /**
+     * Restriction SIM réelle : bloque les appels sortants non essentiels
+     * (les appels d'urgence restent TOUJOURS disponibles, Android les
+     * exempte automatiquement de DISALLOW_OUTGOING_CALLS). Nécessite
+     * Device Owner. Auparavant cette fonction n'existait pas : l'action
+     * "Bloquer SIM" de l'admin ne faisait donc jamais rien sur le téléphone.
+     */
+    fun disableSim(context: Context) {
+        if (!isDeviceOwner(context)) {
+            Log.w(TAG, "Non Device Owner : impossible de restreindre les appels.")
+            return
+        }
+        val admin = GgcDeviceOwnerReceiver.getComponentName(context)
+        dpm(context).addUserRestriction(admin, UserManager.DISALLOW_OUTGOING_CALLS)
+    }
+
+    fun enableSim(context: Context) {
+        if (!isDeviceOwner(context)) return
+        val admin = GgcDeviceOwnerReceiver.getComponentName(context)
+        dpm(context).clearUserRestriction(admin, UserManager.DISALLOW_OUTGOING_CALLS)
+    }
+
+    /**
+     * Point d'entrée unique utilisé à la fois par MainActivity (canal Flutter,
+     * utilisé par la vérification quotidienne) et par GgcFirebaseMessagingService
+     * (push, pour une application immédiate même si l'app Flutter n'est pas
+     * ouverte). Garde les deux chemins strictement synchronisés.
+     */
+    fun appliquerAction(context: Context, action: String) {
+        when (action) {
+            "lock_ecran" -> lockScreenNow(context)
+            "lock_wifi" -> {
+                disableWifi(context)
+                if (isDeviceOwner(context)) blockUninstall(context)
+            }
+            "lock_sim" -> disableSim(context)
+            "unlock_all", "unlock_partiel" -> {
+                enableWifi(context)
+                enableSim(context)
+            }
+            "liberer" -> {
+                enableWifi(context)
+                enableSim(context)
+                unlockDevice(context)
+            }
+            else -> Log.w(TAG, "Action inconnue reçue : $action")
+        }
     }
 
     /** Empêche l'ajout d'un nouveau compte Google (anti factory-reset furtif). */

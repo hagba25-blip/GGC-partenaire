@@ -22,6 +22,7 @@ class _MainNavScreenState extends State<MainNavScreen> {
   int _index = 0;
   int _notifNonLues = 0;
   int _notifRefreshTrigger = 0;
+  int _echeancierRefreshTrigger = 0;
 
   @override
   void initState() {
@@ -44,11 +45,30 @@ class _MainNavScreenState extends State<MainNavScreen> {
     _chargerBadge();
   }
 
+  /// Appelé quand le client crée un échéancier pour un produit (bouton
+  /// "Intéressé" -> "Oui, créez-moi un paiement"). Bascule sur l'onglet
+  /// Paiement et force le rechargement de l'échéancier, sans toucher au
+  /// rôle habituel du bouton "Intéressé".
+  void allerPaiementApresAchat() {
+    setState(() {
+      _index = 0;
+      _echeancierRefreshTrigger++;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final screens = [
-      EcheancierScreen(clientId: widget.clientId, montantEcheance: widget.montantEcheance),
-      ProduitsScreen(clientId: widget.clientId, onInteretEnvoye: allerNotifications),
+      EcheancierScreen(
+        clientId: widget.clientId,
+        montantEcheance: widget.montantEcheance,
+        refreshTrigger: _echeancierRefreshTrigger,
+      ),
+      ProduitsScreen(
+        clientId: widget.clientId,
+        onInteretEnvoye: allerNotifications,
+        onAchatCree: allerPaiementApresAchat,
+      ),
       NotificationsScreen(
         clientId: widget.clientId,
         onOuvert: _chargerBadge,

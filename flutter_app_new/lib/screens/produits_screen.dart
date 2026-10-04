@@ -3,11 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import 'choix_paiement_produit_screen.dart';
 
 class ProduitsScreen extends StatefulWidget {
   final String clientId;
   final VoidCallback onInteretEnvoye;
-  const ProduitsScreen({super.key, required this.clientId, required this.onInteretEnvoye});
+  final VoidCallback? onAchatCree;
+  const ProduitsScreen({
+    super.key,
+    required this.clientId,
+    required this.onInteretEnvoye,
+    this.onAchatCree,
+  });
 
   @override
   State<ProduitsScreen> createState() => _ProduitsScreenState();
@@ -32,7 +39,10 @@ class _ProduitsScreenState extends State<ProduitsScreen> {
     }
   }
 
-  Future<void> _interesser(Map produit) async {
+  /// Rôle original du bouton "Intéressé" : signale juste l'intérêt du
+  /// client, sans créer de paiement. Appelé quand le client choisit
+  /// "Non, juste que je suis intéressé" dans la boîte de confirmation.
+  Future<void> _signalerInteretSimple(Map produit) async {
     try {
       await ApiService.signalerInteret(
         clientId: widget.clientId,
@@ -51,6 +61,50 @@ class _ProduitsScreenState extends State<ProduitsScreen> {
         SnackBar(content: Text(e.toString().replaceFirst("Exception: ", ""))),
       );
     }
+  }
+
+  /// Nouveau comportement du bouton "Intéressé" : demande d'abord au
+  /// client s'il veut qu'on lui crée un paiement pour ce produit, ou
+  /// simplement signaler son intérêt comme avant.
+  Future<void> _interesser(Map produit) async {
+    final choix = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(produit["nom"] ?? "Produit"),
+        content: const Text(
+          "Voulez-vous que nous vous créions un plan de paiement pour "
+          "ce produit, ou juste signaler votre intérêt ?",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Non, juste intéressé"),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Oui, créez-moi un paiement"),
+          ),
+        ],
+      ),
+    );
+
+    if (choix == true) {
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ChoixPaiementProduitScreen(
+            clientId: widget.clientId,
+            produit: produit,
+            onAchatCree: widget.onAchatCree,
+          ),
+        ),
+      );
+    } else if (choix == false) {
+      await _signalerInteretSimple(produit);
+    }
+    // choix == null (dialogue fermé sans choix) : on ne fait rien,
+    // exactement comme si le client n'avait pas cliqué.
   }
 
   @override
@@ -130,11 +184,19 @@ class _ProduitCardState extends State<_ProduitCard> {
               child: PageView.builder(
                 controller: _pageController,
                 itemCount: images.length,
-                itemBuilder: (_, i) => Image.network(
-                  images[i], fit: BoxFit.cover, width: double.infinity,
-                  errorBuilder: (_, __, ___) => Container(
-                    color: AppColors.skyLight,
-                    child: const Icon(Icons.image_not_supported, size: 48, color: AppColors.skyBlue),
+                itemBuilder: (_, i) => Container(
+                  // Fond derrière l'image : comble l'espace quand la photo
+                  // n'a pas exactement les proportions du cadre, au lieu
+                  // de rogner le produit sur les bords (BoxFit.contain
+                  // affiche toujours l'image entière, sans rien couper).
+                  color: AppColors.skyLight,
+                  width: double.infinity,
+                  child: Image.network(
+                    images[i], fit: BoxFit.contain, width: double.infinity,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: AppColors.skyLight,
+                      child: const Icon(Icons.image_not_supported, size: 48, color: AppColors.skyBlue),
+                    ),
                   ),
                 ),
               ),

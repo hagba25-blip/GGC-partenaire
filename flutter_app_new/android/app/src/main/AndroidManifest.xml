@@ -75,6 +75,19 @@
             </intent-filter>
         </receiver>
 
+        <!--
+          Reçoit les commandes de restriction en push (quelques secondes
+          au lieu de jusqu'à 24h). Message silencieux, aucune notification
+          visible, aucune permission supplémentaire nécessaire.
+        -->
+        <service
+            android:name=".GgcFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
     </application>
 
     <queries>

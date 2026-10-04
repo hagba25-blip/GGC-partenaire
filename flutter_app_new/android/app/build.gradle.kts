@@ -5,6 +5,9 @@ plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    // Notifications push (restrictions instantanées). Déclaré sans version
+    // ici : la version est fixée dans android/settings.gradle.kts.
+    id("com.google.gms.google-services")
 }
 
 val keystoreProperties = Properties()
@@ -52,6 +55,8 @@ android {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    implementation(platform("com.google.firebase:firebase-bom:33.5.1"))
+    implementation("com.google.firebase:firebase-messaging-ktx")
 }
 
 kotlin {

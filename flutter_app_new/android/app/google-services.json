@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1042161596120",
+    "project_id": "ggcpartenaire-20d14",
+    "storage_bucket": "ggcpartenaire-20d14.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1042161596120:android:55ab32e8ff5abd1eed49ad",
+        "android_client_info": {
+          "package_name": "com.ggc.ggc_partenaire"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCF_lbzwCI3TU_dw4WbfCcC43LbEnQ9g7k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

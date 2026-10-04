@@ -129,6 +129,35 @@ class ApiService {
     return jsonDecode(res.body);
   }
 
+  /// Crée un échéancier secondaire pour l'achat d'un produit (bouton
+  /// "Intéressé" -> "Oui, créez-moi un paiement"). N'affecte jamais
+  /// l'échéancier principal du crédit téléphone.
+  static Future<Map<String, dynamic>> creerAchatProduit({
+    required String clientId,
+    required String produitId,
+    required String modePaiement,
+    required int dureeMois,
+  }) async {
+    final res = await http.post(
+      Uri.parse("$baseUrl/api/client/creer-achat-produit"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({
+        "client_id": clientId,
+        "produit_id": produitId,
+        "mode_paiement": modePaiement,
+        "duree_mois": dureeMois,
+      }),
+    );
+    return _handle(res);
+  }
+
+  /// Liste des échéanciers secondaires (produits achetés à crédit),
+  /// chacun avec sa propre liste d'échéances.
+  static Future<List<dynamic>> getAchats(String clientId) async {
+    final res = await http.get(Uri.parse("$baseUrl/api/client/$clientId/achats"));
+    return jsonDecode(res.body);
+  }
+
   static Future<void> signalerInteret({
     required String clientId,
     required String type,
@@ -175,6 +204,24 @@ class ApiService {
   static Future<Map<String, dynamic>> getDeviceStatut(String deviceId) async {
     final res = await http.get(Uri.parse("$baseUrl/api/device/$deviceId/statut"));
     return jsonDecode(res.body);
+  }
+
+  /// Enregistre/renouvelle le token FCM de l'appareil, pour que le serveur
+  /// puisse envoyer une restriction en push (quelques secondes) au lieu
+  /// d'attendre la vérification quotidienne de la tâche de fond.
+  static Future<void> enregistrerFcmToken({
+    required String deviceId,
+    required String fcmToken,
+  }) async {
+    try {
+      await http.post(
+        Uri.parse("$baseUrl/api/device/fcm-token"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"device_id": deviceId, "fcm_token": fcmToken}),
+      );
+    } catch (_) {
+      // Pas bloquant : réessayé au prochain démarrage de l'app.
+    }
   }
 
   static Future<bool> clientExiste(String clientId) async {

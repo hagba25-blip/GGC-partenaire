@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../services/session_service.dart';
+import '../services/fcm_service.dart';
 import 'otp_screen.dart';
 import 'connexion_screen.dart';
 
@@ -92,6 +93,10 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
 
       // Première position envoyée immédiatement (l'admin n'a pas à attendre 24h)
       _envoyerPositionInitiale(res["device_id"]);
+
+      // Enregistre le token push dès maintenant pour que les restrictions
+      // futures soient instantanées (la clé device_id vient d'être sauvée).
+      FcmService.registerTokenIfPossible();
 
       if (!mounted) return;
       Navigator.push(context, MaterialPageRoute(

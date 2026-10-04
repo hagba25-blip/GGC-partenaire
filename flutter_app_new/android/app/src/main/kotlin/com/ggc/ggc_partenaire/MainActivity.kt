@@ -101,11 +101,11 @@ class MainActivity : FlutterActivity() {
                     result.success(null)
                 }
                 "disableSim" -> {
-                    // Nécessite un profil Device Owner (déploiement entreprise / QR provisioning)
-                    // pour désactiver réellement la radio SIM. Documenté dans README.md.
+                    GgcPolicyManager.disableSim(this)
                     result.success(null)
                 }
                 "enableSim" -> {
+                    GgcPolicyManager.enableSim(this)
                     result.success(null)
                 }
                 else -> result.notImplemented()

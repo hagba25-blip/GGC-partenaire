@@ -19,6 +19,10 @@ from pydantic import BaseModel, EmailStr
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
+import json
+import firebase_admin
+from firebase_admin import credentials, messaging
+
 load_dotenv()
 
 # ---------------------------------------------------------------------------
@@ -34,6 +38,50 @@ LEEKPAY_PUBLIC_KEY = os.environ.get("LEEKPAY_PUBLIC_KEY", "")
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "https://ggc-partenaire.onrender.com")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+# ---------------------------------------------------------------------------
+# FIREBASE (notifications push) — permet d'envoyer une restriction au
+# téléphone en quelques secondes, au lieu d'attendre jusqu'à 24h la tâche
+# de fond (souvent tuée par les gestionnaires de batterie Tecno/Infinix).
+# Si FIREBASE_SERVICE_ACCOUNT_JSON n'est pas configurée, le push est
+# simplement ignoré (log) : aucune route existante n'est bloquée.
+# ---------------------------------------------------------------------------
+FIREBASE_SERVICE_ACCOUNT_JSON = os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON", "")
+firebase_pret = False
+if FIREBASE_SERVICE_ACCOUNT_JSON:
+    try:
+        cred_dict = json.loads(FIREBASE_SERVICE_ACCOUNT_JSON)
+        firebase_admin.initialize_app(credentials.Certificate(cred_dict))
+        firebase_pret = True
+    except Exception as e:
+        print(f"[ERREUR FIREBASE] Initialisation échouée : {e}")
+else:
+    print("[DEV] FIREBASE_SERVICE_ACCOUNT_JSON non configurée. Les restrictions "
+          "resteront limitées à la vérification quotidienne (jusqu'à 24h).")
+
+def envoyer_push_restriction(device_id: str, action: str):
+    """
+    Envoie une commande push silencieuse (data-only, aucune notification
+    visible) au téléphone concerné, pour qu'il applique la restriction
+    immédiatement au lieu d'attendre la tâche de fond quotidienne.
+    N'échoue jamais bruyamment : en cas de problème, la vérification
+    quotidienne reste le filet de sécurité existant.
+    """
+    if not firebase_pret:
+        return
+    try:
+        device_res = supabase.table("devices").select("fcm_token").eq("id", device_id).execute()
+        if not device_res.data or not device_res.data[0].get("fcm_token"):
+            return
+        token = device_res.data[0]["fcm_token"]
+        message = messaging.Message(
+            data={"action": action},
+            token=token,
+            android=messaging.AndroidConfig(priority="high"),
+        )
+        messaging.send(message)
+    except Exception as e:
+        print(f"[ERREUR PUSH] device_id={device_id} action={action} : {e}")
 
 app = FastAPI(title="GGC PARTENAIRE API")
 app.add_middleware(
@@ -87,6 +135,10 @@ class PositionUpdate(BaseModel):
     lng: float
     ip_address: Optional[str] = None
 
+class FcmTokenRequest(BaseModel):
+    device_id: str
+    fcm_token: str
+
 class PaiementRequest(BaseModel):
     client_id: str
     echeance_id: str
@@ -117,6 +169,12 @@ class OffreRequest(BaseModel):
     titre: str
     description: Optional[str] = None
     image: Optional[str] = None
+
+class AchatProduitRequest(BaseModel):
+    client_id: str
+    produit_id: str
+    mode_paiement: Literal["jour", "semaine", "mois"]
+    duree_mois: Literal[3, 6, 8]
 
 class AppVersionRequest(BaseModel):
     version_code: int
@@ -375,8 +433,75 @@ def client_existe(client_id: str):
 
 @app.get("/api/client/{client_id}/echeances")
 def get_echeances(client_id: str):
-    res = supabase.table("echeances").select("*").eq("client_id", client_id).order("numero").execute()
+    """
+    Échéancier du crédit téléphone PRINCIPAL uniquement (achat_id IS NULL).
+    Les échéanciers de produits achetés via le bouton "Intéressé" sont
+    séparés et accessibles via GET /api/client/{id}/achats, pour ne jamais
+    mélanger ni casser l'affichage de l'échéancier principal existant.
+    """
+    res = (supabase.table("echeances").select("*")
+           .eq("client_id", client_id)
+           .is_("achat_id", "null")
+           .order("numero").execute())
     return res.data
+
+@app.post("/api/client/creer-achat-produit")
+def creer_achat_produit(data: AchatProduitRequest):
+    """
+    Le client accepte de payer un produit à crédit (depuis le bouton
+    'Intéressé' -> 'Oui, créez-moi un paiement'). Crée un échéancier
+    secondaire, indépendant du crédit téléphone principal.
+    """
+    produit_res = supabase.table("produits").select("*").eq("id", data.produit_id).execute()
+    if not produit_res.data:
+        raise HTTPException(404, "Produit introuvable.")
+    produit = produit_res.data[0]
+
+    nb_echeances, montant = calculer_echeances(
+        produit["prix_normal"], data.mode_paiement, data.duree_mois
+    )
+
+    achat = supabase.table("achats").insert({
+        "client_id": data.client_id,
+        "produit_id": data.produit_id,
+        "nom": produit["nom"],
+        "prix_total": produit["prix_normal"],
+        "mode_paiement": data.mode_paiement,
+        "duree_mois": data.duree_mois,
+        "montant_echeance": montant,
+    }).execute()
+    achat_id = achat.data[0]["id"]
+
+    today = date.today()
+    for i in range(1, nb_echeances + 1):
+        if data.mode_paiement == "jour":
+            date_prevue = today + timedelta(days=i)
+        elif data.mode_paiement == "semaine":
+            date_prevue = today + timedelta(weeks=i)
+        else:
+            date_prevue = today + timedelta(days=30 * i)
+
+        supabase.table("echeances").insert({
+            "client_id": data.client_id,
+            "achat_id": achat_id,
+            "numero": i,
+            "montant": montant,
+            "date_prevue": date_prevue.isoformat(),
+        }).execute()
+
+    return {"message": "Plan de paiement créé.", "achat_id": achat_id,
+            "nb_echeances": nb_echeances, "montant_echeance": montant}
+
+@app.get("/api/client/{client_id}/achats")
+def liste_achats(client_id: str):
+    """Liste des achats secondaires (produits) avec leurs échéances,
+    affichés séparément du crédit téléphone principal sur 'Mon échéancier'."""
+    achats_res = supabase.table("achats").select("*").eq("client_id", client_id).order("created_at").execute()
+    result = []
+    for achat in achats_res.data:
+        echeances_res = supabase.table("echeances").select("*").eq("achat_id", achat["id"]).order("numero").execute()
+        result.append({**achat, "echeances": echeances_res.data})
+    return result
 
 @app.post("/api/client/creer-paiement")
 def creer_paiement(data: CreerPaiementRequest):
@@ -489,6 +614,18 @@ async def leekpay_webhook(request: Request):
                 "device_admin_actif": False,
                 "statut_appareil": "normal",
             }).eq("id", device.data[0]["id"]).execute()
+            # Libère le téléphone immédiatement (lève les restrictions +
+            # débloque la désinstallation) au lieu d'attendre 24h.
+            envoyer_push_restriction(device.data[0]["id"], "liberer")
+    else:
+        # Le crédit n'est pas soldé, mais si ce paiement a régularisé
+        # toutes les échéances en retard, le client ne doit plus
+        # apparaître "En retard" sur le tableau de bord.
+        encore_en_retard = supabase.table("echeances").select("id").eq("client_id", client_id).eq("statut", "en_retard").execute()
+        if not encore_en_retard.data:
+            client_actuel = supabase.table("clients").select("statut").eq("id", client_id).execute()
+            if client_actuel.data and client_actuel.data[0]["statut"] == "en_retard":
+                supabase.table("clients").update({"statut": "actif"}).eq("id", client_id).execute()
 
     return {"message": "Paiement confirmé."}
 
@@ -517,6 +654,16 @@ def payer_echeance(data: PaiementRequest):
                 "device_admin_actif": False,  # le client peut désinstaller l'app
                 "statut_appareil": "normal",
             }).eq("id", device.data[0]["id"]).execute()
+            envoyer_push_restriction(device.data[0]["id"], "liberer")
+    else:
+        # Le crédit n'est pas soldé, mais si ce paiement a régularisé
+        # toutes les échéances en retard, le client ne doit plus
+        # apparaître "En retard" sur le tableau de bord.
+        encore_en_retard = supabase.table("echeances").select("id").eq("client_id", data.client_id).eq("statut", "en_retard").execute()
+        if not encore_en_retard.data:
+            client_actuel = supabase.table("clients").select("statut").eq("id", data.client_id).execute()
+            if client_actuel.data and client_actuel.data[0]["statut"] == "en_retard":
+                supabase.table("clients").update({"statut": "actif"}).eq("id", data.client_id).execute()
 
     return {"message": "Paiement enregistré."}
 
@@ -532,6 +679,16 @@ def update_position(data: PositionUpdate):
         "ip_address": data.ip_address,
     }).eq("id", data.device_id).execute()
     return {"message": "Position mise à jour."}
+
+@app.post("/api/device/fcm-token")
+def enregistrer_fcm_token(data: FcmTokenRequest):
+    """
+    Appelée par l'app à chaque démarrage (et à chaque renouvellement de
+    token Firebase) pour que le serveur puisse réveiller ce téléphone
+    instantanément en cas de restriction, au lieu d'attendre jusqu'à 24h.
+    """
+    supabase.table("devices").update({"fcm_token": data.fcm_token}).eq("id", data.device_id).execute()
+    return {"message": "Token enregistré."}
 
 @app.get("/api/device/{device_id}/statut")
 def get_device_statut(device_id: str):
@@ -606,6 +763,11 @@ def appliquer_restriction(data: RestrictionRequest, admin=Depends(get_current_ad
         "raison": data.raison,
     }).execute()
 
+    # Réveille le téléphone immédiatement via push (quelques secondes) au
+    # lieu d'attendre la vérification quotidienne, qui est souvent tuée
+    # par les gestionnaires de batterie Tecno/Infinix/itel.
+    envoyer_push_restriction(device["id"], data.action)
+
     return {"message": f"Action '{data.action}' appliquée."}
 
 @app.get("/api/admin/actions/{client_id}")
@@ -622,10 +784,14 @@ def verifier_retards():
     À appeler une fois par jour (cron / scheduler externe, ex. GitHub Actions ou Render Cron).
     Marque les échéances en retard, envoie des rappels, et restreint automatiquement
     les clients qui dépassent 7 jours de retard.
+    Ne considère QUE le crédit téléphone principal (achat_id IS NULL) : un
+    retard sur un produit secondaire ne bloque jamais l'appareil.
     """
     today = date.today().isoformat()
-    en_retard = supabase.table("echeances").select("*, clients(*)") \
-        .eq("statut", "a_payer").lt("date_prevue", today).execute()
+    en_retard = (supabase.table("echeances").select("*, clients(*)")
+                 .eq("statut", "a_payer")
+                 .is_("achat_id", "null")
+                 .lt("date_prevue", today).execute())
 
     for ech in en_retard.data:
         supabase.table("echeances").update({"statut": "en_retard"}).eq("id", ech["id"]).execute()
@@ -638,6 +804,14 @@ def verifier_retards():
             "type": "retard",
         }).execute()
 
+        # Avant, le statut du client restait "actif" tant que le retard
+        # n'atteignait pas 7 jours : "En retard de paiement" sur le
+        # tableau de bord affichait donc toujours 0, même avec des
+        # échéances en retard. On reflète maintenant le retard dès le
+        # premier jour, sans toucher au seuil de 7 jours pour le blocage.
+        if jours_retard < 7 and client["statut"] == "actif":
+            supabase.table("clients").update({"statut": "en_retard"}).eq("id", client["id"]).execute()
+
         if jours_retard >= 7:
             supabase.table("clients").update({"statut": "bloque"}).eq("id", client["id"]).execute()
             device = supabase.table("devices").select("id").eq("client_id", client["id"]).execute()
@@ -649,6 +823,9 @@ def verifier_retards():
                     "action": "lock_wifi",
                     "raison": f"Auto : {jours_retard} jours de retard",
                 }).execute()
+                # Restriction automatique appliquée immédiatement sur le
+                # téléphone, sans attendre son propre cycle de 24h.
+                envoyer_push_restriction(device.data[0]["id"], "lock_wifi")
 
     return {"message": f"{len(en_retard.data)} échéance(s) traitée(s)."}
 

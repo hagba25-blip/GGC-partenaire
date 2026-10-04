@@ -7,19 +7,27 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
 import '../services/notification_service.dart';
+import '../services/fcm_service.dart';
 import '../theme/app_theme.dart';
 import 'inscription_screen.dart';
 
 class EcheancierScreen extends StatefulWidget {
   final String clientId;
   final double montantEcheance;
-  const EcheancierScreen({super.key, required this.clientId, required this.montantEcheance});
+  final int refreshTrigger;
+  const EcheancierScreen({
+    super.key,
+    required this.clientId,
+    required this.montantEcheance,
+    this.refreshTrigger = 0,
+  });
   @override
   State<EcheancierScreen> createState() => _EcheancierScreenState();
 }
 
 class _EcheancierScreenState extends State<EcheancierScreen> with WidgetsBindingObserver {
   List<dynamic> echeances = [];
+  List<dynamic> achats = [];
   bool loading = true;
 
   @override
@@ -28,6 +36,19 @@ class _EcheancierScreenState extends State<EcheancierScreen> with WidgetsBinding
     WidgetsBinding.instance.addObserver(this);
     _load();
     _envoyerPositionActuelle();
+    // Filet de sécurité : garantit que le token push est bien enregistré
+    // (utile si l'enregistrement initial avait échoué faute de réseau).
+    FcmService.registerTokenIfPossible();
+  }
+
+  @override
+  void didUpdateWidget(EcheancierScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // IndexedStack ne reconstruit pas les onglets cachés : on force le
+    // rechargement quand on revient d'un nouvel achat créé via Produits.
+    if (oldWidget.refreshTrigger != widget.refreshTrigger) {
+      _load();
+    }
   }
 
   @override
@@ -69,8 +90,16 @@ class _EcheancierScreenState extends State<EcheancierScreen> with WidgetsBinding
 
   Future<void> _load() async {
     final data = await ApiService.getEcheances(widget.clientId);
+    List<dynamic> achatsData = [];
+    try {
+      achatsData = await ApiService.getAchats(widget.clientId);
+    } catch (_) {
+      // Ne bloque jamais l'affichage de l'échéancier principal si les
+      // échéanciers secondaires (produits) échouent à charger.
+    }
     setState(() {
       echeances = data;
+      achats = achatsData;
       loading = false;
     });
     // Reprogramme les rappels locaux à chaque chargement, pour rester
@@ -147,40 +176,66 @@ class _EcheancierScreenState extends State<EcheancierScreen> with WidgetsBinding
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : FadeIn(
-              child: ListView.builder(
+              child: ListView(
                 padding: const EdgeInsets.all(16),
-                itemCount: echeances.length,
-                itemBuilder: (_, i) {
-                  final e = echeances[i];
-                  final payee = e["statut"] == "payee";
-                  final retard = e["statut"] == "en_retard";
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: payee
-                            ? AppColors.success
-                            : retard
-                                ? AppColors.danger
-                                : AppColors.skyBlue,
-                        child: Icon(
-                          payee ? Icons.check : Icons.euro_rounded,
-                          color: Colors.white,
-                        ),
-                      ),
-                      title: Text("Échéance n°${e["numero"]} — ${e["montant"]} FCFA"),
-                      subtitle: Text("Prévue le ${DateFormat('dd/MM/yyyy').format(DateTime.parse(e["date_prevue"]))}"),
-                      trailing: payee
-                          ? const Text("Payée", style: TextStyle(color: AppColors.success, fontWeight: FontWeight.bold))
-                          : ElevatedButton(
-                              onPressed: () => _payer(e),
-                              child: const Text("Payer"),
-                            ),
-                    ),
-                  );
-                },
+                children: [
+                  ...echeances.map((e) => _echeanceTile(e)),
+                  if (achats.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    for (final achat in achats) _achatSection(achat),
+                  ],
+                ],
               ),
             ),
+    );
+  }
+
+  Widget _echeanceTile(Map e) {
+    final payee = e["statut"] == "payee";
+    final retard = e["statut"] == "en_retard";
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: payee
+              ? AppColors.success
+              : retard
+                  ? AppColors.danger
+                  : AppColors.skyBlue,
+          child: Icon(
+            payee ? Icons.check : Icons.euro_rounded,
+            color: Colors.white,
+          ),
+        ),
+        title: Text("Échéance n°${e["numero"]} — ${e["montant"]} FCFA"),
+        subtitle: Text("Prévue le ${DateFormat('dd/MM/yyyy').format(DateTime.parse(e["date_prevue"]))}"),
+        trailing: payee
+            ? const Text("Payée", style: TextStyle(color: AppColors.success, fontWeight: FontWeight.bold))
+            : ElevatedButton(
+                onPressed: () => _payer(e),
+                child: const Text("Payer"),
+              ),
+      ),
+    );
+  }
+
+  /// Échéancier secondaire d'un produit acheté à crédit (ex: "Tecno —
+  /// paiement"). Affiché sous l'échéancier principal, avec le même
+  /// fonctionnement (même carte, même bouton Payer), sans jamais le modifier.
+  Widget _achatSection(Map achat) {
+    final echeancesAchat = (achat["echeances"] as List?) ?? [];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 16, bottom: 8),
+          child: Text(
+            "${achat["nom"]} — Paiement",
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.skyBlueDark),
+          ),
+        ),
+        ...echeancesAchat.map((e) => _echeanceTile(e)),
+      ],
     );
   }
 }

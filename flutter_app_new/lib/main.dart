@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'theme/app_theme.dart';
 import 'screens/inscription_screen.dart';
 import 'screens/otp_screen.dart';
@@ -10,12 +11,25 @@ import 'services/background_service.dart';
 import 'services/session_service.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
+import 'services/fcm_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await NotificationService.init();
   await NotificationService.requestPermissions();
   await BackgroundService.init(); // lance la tâche quotidienne (position + statut)
+
+  // Notifications push : permet d'appliquer une restriction en quelques
+  // secondes au lieu d'attendre jusqu'à 24h la tâche de fond ci-dessus.
+  try {
+    await Firebase.initializeApp();
+    await FcmService.init();
+  } catch (_) {
+    // Si google-services.json n'est pas encore configuré, l'app continue
+    // de fonctionner normalement : seule la restriction instantanée
+    // n'est pas disponible, la vérification quotidienne reste active.
+  }
+
   runApp(const GgcPartenaireApp());
 }
 
