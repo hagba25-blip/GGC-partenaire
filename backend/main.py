@@ -68,10 +68,12 @@ def envoyer_push_restriction(device_id: str, action: str):
     quotidienne reste le filet de sécurité existant.
     """
     if not firebase_pret:
+        print(f"[PUSH IGNORÉ] Firebase non configuré. device_id={device_id} action={action}")
         return
     try:
         device_res = supabase.table("devices").select("fcm_token").eq("id", device_id).execute()
         if not device_res.data or not device_res.data[0].get("fcm_token"):
+            print(f"[PUSH IGNORÉ] Pas de token FCM pour device_id={device_id} action={action}")
             return
         token = device_res.data[0]["fcm_token"]
         message = messaging.Message(
@@ -79,7 +81,8 @@ def envoyer_push_restriction(device_id: str, action: str):
             token=token,
             android=messaging.AndroidConfig(priority="high"),
         )
-        messaging.send(message)
+        message_id = messaging.send(message)
+        print(f"[PUSH OK] device_id={device_id} action={action} message_id={message_id}")
     except Exception as e:
         print(f"[ERREUR PUSH] device_id={device_id} action={action} : {e}")
 
