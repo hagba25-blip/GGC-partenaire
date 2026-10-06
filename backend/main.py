@@ -121,7 +121,7 @@ class ConnexionRequest(BaseModel):
 class ChoixPaiementRequest(BaseModel):
     client_id: str
     mode_paiement: Literal["jour", "semaine", "mois"]
-    duree_mois: Literal[6, 8, 10]
+    duree_mois: Literal[3, 6, 9, 12]
 
 class AdminLoginRequest(BaseModel):
     username: str
@@ -177,7 +177,7 @@ class AchatProduitRequest(BaseModel):
     client_id: str
     produit_id: str
     mode_paiement: Literal["jour", "semaine", "mois"]
-    duree_mois: Literal[3, 6, 8]
+    duree_mois: Literal[3, 6, 9, 12]
 
 class AppVersionRequest(BaseModel):
     version_code: int
