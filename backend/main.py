@@ -86,6 +86,36 @@ def envoyer_push_restriction(device_id: str, action: str):
     except Exception as e:
         print(f"[ERREUR PUSH] device_id={device_id} action={action} : {e}")
 
+def envoyer_notification_retard(device_id: str, titre: str, corps: str):
+    """
+    Envoie une VRAIE notification visible (contrairement à
+    envoyer_push_restriction qui est silencieuse, data-only) : Android
+    l'affiche automatiquement même si l'application est fermée ou en
+    arrière-plan, sans dépendre de l'ouverture de l'app par le client ni
+    de la tâche de fond quotidienne (WorkManager), peu fiable.
+    N'échoue jamais bruyamment : en cas de problème, l'entrée dans la
+    table "notifications" (onglet Notifications de l'app) reste le filet
+    de sécurité existant.
+    """
+    if not firebase_pret:
+        print(f"[NOTIF IGNORÉE] Firebase non configuré. device_id={device_id}")
+        return
+    try:
+        device_res = supabase.table("devices").select("fcm_token").eq("id", device_id).execute()
+        if not device_res.data or not device_res.data[0].get("fcm_token"):
+            print(f"[NOTIF IGNORÉE] Pas de token FCM pour device_id={device_id}")
+            return
+        token = device_res.data[0]["fcm_token"]
+        message = messaging.Message(
+            notification=messaging.Notification(title=titre, body=corps),
+            token=token,
+            android=messaging.AndroidConfig(priority="high"),
+        )
+        message_id = messaging.send(message)
+        print(f"[NOTIF OK] device_id={device_id} message_id={message_id}")
+    except Exception as e:
+        print(f"[ERREUR NOTIF] device_id={device_id} : {e}")
+
 app = FastAPI(title="GGC PARTENAIRE API")
 app.add_middleware(
     CORSMiddleware,
@@ -806,6 +836,20 @@ def verifier_retards():
             "message": f"Échéance en retard de {jours_retard} jour(s). Merci de régulariser.",
             "type": "retard",
         }).execute()
+
+        # Notification visible envoyée directement au téléphone (même app
+        # fermée), en plus de l'entrée dans l'onglet "Notifications" de
+        # l'app ci-dessus. N'échoue jamais bruyamment : si Firebase ou le
+        # token du téléphone n'est pas disponible, cette ligne est
+        # simplement ignorée (voir envoyer_notification_retard), le reste
+        # de la boucle continue normalement.
+        device_notif = supabase.table("devices").select("id").eq("client_id", client["id"]).execute()
+        if device_notif.data:
+            envoyer_notification_retard(
+                device_notif.data[0]["id"],
+                "Paiement en retard",
+                f"Échéance en retard de {jours_retard} jour(s). Merci de régulariser.",
+            )
 
         # Avant, le statut du client restait "actif" tant que le retard
         # n'atteignait pas 7 jours : "En retard de paiement" sur le
