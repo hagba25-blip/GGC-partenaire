@@ -4,7 +4,7 @@ document.getElementById("adminBadge").textContent = localStorage.getItem("ggc_us
 // Code d'accès demandé avant d'afficher le détail d'un client. Ceci est
 // une barrière d'interface uniquement (visible dans le code source de la
 // page) : la vraie protection reste la connexion admin (JWT) ci-dessus.
-const CODE_ACCES_DETAIL = "@ggc#aces+admin100%";
+const CODE_ACCES_DETAIL = "9697-ser"; 
 const codeEntre = prompt("Code d'accès requis pour consulter le détail du client :");
 if (codeEntre !== CODE_ACCES_DETAIL) {
   alert("Code incorrect. Retour à la liste des clients.");
