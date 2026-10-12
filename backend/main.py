@@ -172,6 +172,13 @@ class FcmTokenRequest(BaseModel):
     device_id: str
     fcm_token: str
 
+class DiagnosticRequest(BaseModel):
+    device_id: str
+    action: str
+    etape: str
+    succes: bool
+    details: Optional[str] = None
+
 class PaiementRequest(BaseModel):
     client_id: str
     echeance_id: str
@@ -722,6 +729,22 @@ def enregistrer_fcm_token(data: FcmTokenRequest):
     """
     supabase.table("devices").update({"fcm_token": data.fcm_token}).eq("id", data.device_id).execute()
     return {"message": "Token enregistré."}
+
+@app.post("/api/device/diagnostic")
+def recevoir_diagnostic(data: DiagnosticRequest):
+    """
+    Reçoit un rapport de diagnostic envoyé directement par le téléphone
+    (natif Android, GgcPolicyManager.kt) après chaque tentative de
+    restriction (Wifi, SIM, écran). Affiché dans les logs Render avec le
+    préfixe [DIAG], exactement comme [PUSH OK]/[NOTIF OK], pour pouvoir
+    diagnostiquer un téléphone client à distance, sans accès physique ni
+    câble USB. N'écrit rien en base : aucune nouvelle table nécessaire,
+    donc aucun risque pour les données existantes.
+    """
+    statut = "OK" if data.succes else "ÉCHEC"
+    print(f"[DIAG {statut}] device_id={data.device_id} action={data.action} "
+          f"etape={data.etape} details={data.details}")
+    return {"message": "Diagnostic reçu."}
 
 @app.get("/api/device/{device_id}/statut")
 def get_device_statut(device_id: str):
